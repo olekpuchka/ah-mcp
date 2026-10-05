@@ -1,44 +1,17 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { HttpOptions } from "../config.ts";
 import { log } from "../log.ts";
+import { OAuth } from "./oauth.ts";
+import { isLoopbackHost, readBody } from "./request.ts";
 
 const MCP_PATH = "/mcp";
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
-function isLoopbackHost(host: string): boolean {
-  const h = host.replace(/^\[|\]$/g, "");
-  return h === "localhost" || h === "::1" || /^127\./.test(h);
-}
-
 /** Reports whether url's host is localhost or loopback; an unparsable url is not. */
 function isLocalUrl(url: string): boolean {
   return URL.canParse(url) && isLoopbackHost(new URL(url).hostname);
-}
-
-const sha256 = (s: string) => createHash("sha256").update(s).digest();
-
-/** Checks "Authorization: Bearer <token>" or "?token=<token>" in constant time. */
-function hasToken(req: IncomingMessage, token: string): boolean {
-  // Hashing makes the lengths equal, so the comparison doesn't reveal the token's length either.
-  const expected = sha256(token);
-  const matches = (candidate: string | null | undefined) => Boolean(candidate) && timingSafeEqual(sha256(candidate!), expected);
-  const auth = req.headers.authorization;
-  if (auth?.startsWith("Bearer ") && matches(auth.slice("Bearer ".length))) return true;
-  return matches(new URL(req.url ?? "/", "http://localhost").searchParams.get("token"));
-}
-
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > MAX_BODY_BYTES) throw new Error("request body too large");
-    chunks.push(chunk as Buffer);
-  }
-  return chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : undefined;
 }
 
 /** Serves MCP at /mcp, stateless: each request gets a new server. Resolves once listening. */
@@ -54,30 +27,36 @@ export async function serveHttp(newServer: () => McpServer, opts: HttpOptions): 
   const local = isLocalUrl(opts.baseUrl) && isLoopbackHost(opts.host);
   // Clients omit the port for port 80; a local proxy may listen on another port (the base URL's).
   const allowedHosts = local
-    ? [
-        ...new Set([
-          ...["localhost", "127.0.0.1", "[::1]"].flatMap((h) => (opts.port === 80 ? [h, `${h}:80`] : [`${h}:${opts.port}`])),
-          new URL(opts.baseUrl).host,
-        ]),
-      ]
+    ? new Set([
+        ...["localhost", "127.0.0.1", "[::1]"].flatMap((h) => (opts.port === 80 ? [h, `${h}:80`] : [`${h}:${opts.port}`])),
+        new URL(opts.baseUrl).host,
+      ])
     : undefined;
 
+  // Web clients such as ChatGPT log in with OAuth; others send the token itself.
+  const oauth = new OAuth(opts.baseUrl, MCP_PATH, token);
+
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
-    if (new URL(req.url ?? "/", "http://localhost").pathname !== MCP_PATH) {
+    // Checked here rather than in the MCP transport, so it covers the OAuth routes too.
+    if (allowedHosts && !allowedHosts.has(req.headers.host ?? "")) {
+      res.writeHead(403).end("Forbidden");
+      return;
+    }
+    const url = new URL(req.url ?? "/", "http://localhost");
+    if (await oauth.handle(req, res, url)) return;
+    if (url.pathname !== MCP_PATH) {
       res.writeHead(404).end("Not Found");
       return;
     }
-    if (!hasToken(req, token)) {
-      res.writeHead(401).end("Unauthorized");
+    const challenge = oauth.authenticate(req, url);
+    if (challenge) {
+      res.writeHead(401, { "WWW-Authenticate": challenge }).end("Unauthorized");
       return;
     }
-    const body = req.method === "POST" ? await readJsonBody(req) : undefined;
+    const raw = req.method === "POST" ? await readBody(req, MAX_BODY_BYTES) : "";
+    const body: unknown = raw ? JSON.parse(raw) : undefined;
     const server = newServer();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableDnsRebindingProtection: local,
-      allowedHosts,
-    });
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => {
       void transport.close();
       void server.close();

@@ -137,14 +137,16 @@ Where the settings live differs per client; see its documentation. Clients with 
 
 ### Remote clients (Streamable HTTP)
 
-Web apps such as ChatGPT and Claude.ai only connect to servers on the internet. Set one up first ([Deploying to a server](#deploying-to-a-server)). The endpoint is `https://your-server/mcp`. Send the token as an `Authorization: Bearer YOUR_TOKEN` header if the client lets you set headers; otherwise put it in the URL: `https://your-server/mcp?token=YOUR_TOKEN`.
+Web apps such as ChatGPT and Claude.ai only connect to servers on the internet. Set one up first ([Deploying to a server](#deploying-to-a-server)). The endpoint is `https://your-server/mcp`.
 
-**ChatGPT**: needs Developer mode (Plus, Pro, Business, Enterprise and Education). Open Settings → advanced settings, turn on Developer mode, and create a connector with the URL. Set authentication to **No authentication**: ChatGPT offers only OAuth or none, so the token goes in the URL.
+Clients that support OAuth log in to the server themselves: add the endpoint with OAuth (or automatic) authentication, and the client opens a login page on your server. Enter your `AH_MCP_TOKEN` there once; the client then gets its own tokens and renews them. Clients without OAuth send `AH_MCP_TOKEN` as an `Authorization: Bearer YOUR_TOKEN` header, or in the URL as `https://your-server/mcp?token=YOUR_TOKEN`.
 
-**Claude.ai**: Settings → Connectors → Add custom connector, then paste the URL with the token.
+**ChatGPT**: needs Developer mode (Plus, Pro, Business, Enterprise and Education). Open Settings → advanced settings, turn on Developer mode, and create a connector with the endpoint. Set authentication to **OAuth**.
+
+**Claude.ai**: Settings → Connectors → Add custom connector, then paste the endpoint and choose Connect.
 
 > [!IMPORTANT]
-> A token in a URL can end up in proxy logs. Use a long random value (`openssl rand -hex 32`) and replace it if it leaks.
+> Anyone with `AH_MCP_TOKEN` can use your Albert Heijn account. Use a long random value (`openssl rand -hex 32`). Changing it also logs out every OAuth client. A token in a URL can end up in proxy logs, so prefer OAuth or the header.
 
 ## Configuration
 
@@ -156,8 +158,8 @@ Settings are environment variables. They can also go in a `.env` file in the wor
 | `AH_TOKENS_PATH` | [per OS](#logging-in) | Where to store login tokens. |
 | `AH_MCP_HOST` | `127.0.0.1` | Interface the HTTP server listens on. Keep the default behind a reverse proxy. |
 | `AH_MCP_PORT` | `3000` | HTTP server port. |
-| `AH_MCP_BASE_URL` | `http://localhost:3000` | Public URL of the HTTP server. Set it on a server: for a non-local URL, the localhost-only `Host` check is turned off so a reverse proxy can forward requests. |
-| `AH_MCP_TOKEN` | — | Secret required on every HTTP request, as `Authorization: Bearer …` or `?token=…`. Required for the HTTP transport, which doesn't start without it. |
+| `AH_MCP_BASE_URL` | `http://localhost:3000` | Public URL of the HTTP server. Set it on a server: OAuth clients are sent to this URL to log in, and for a non-local URL the localhost-only `Host` check is turned off so a reverse proxy can forward requests. |
+| `AH_MCP_TOKEN` | — | Secret for the HTTP transport, which doesn't start without it. Clients send it as `Authorization: Bearer …` or `?token=…`, or enter it on the OAuth login page. |
 | `AH_LOG_FILE` | — | Also append logs to this file. Logs always go to stderr. |
 
 Command-line flags:
@@ -166,7 +168,7 @@ Command-line flags:
 node dist/index.js [--transport stdio|streamable-http] [--remote] [--version] [--help]
 ```
 
-`stdio` (the default) is for local clients; `streamable-http` serves MCP at `/mcp`.
+`stdio` (the default) is for local clients; `streamable-http` serves MCP at `/mcp`, with OAuth login at `/authorize`.
 
 ## Deploying to a server
 
@@ -367,6 +369,12 @@ AH accepts order changes only once an order exists. Choose a delivery slot in th
 <summary><b>"The shopping list is not available while a delivery order is active"</b></summary>
 
 Choosing a slot moved your list into the order. Use `ah_get_cart` and `ah_update_cart_item` until the order is delivered or cancelled.
+</details>
+
+<details>
+<summary><b>OAuth login opens at localhost, or the client can't reach it</b></summary>
+
+Set `AH_MCP_BASE_URL` to the server's public `https://` URL and restart it. Clients are sent there to log in.
 </details>
 
 <details>

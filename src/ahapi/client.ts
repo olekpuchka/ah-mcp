@@ -10,13 +10,24 @@ const USER_AGENT = "Appie/9.28 (iPhone17,3; iPhone; CPU OS 26_1 like Mac OS X)";
 const BASE_URL = "https://api.ah.nl";
 const TIMEOUT_MS = 30_000;
 
+/**
+ * An error body as one line of text; tool results cap the length. AH sometimes answers with an
+ * HTML page, whose tags are dropped; other bodies (JSON) keep theirs, e.g. a "<" in a message.
+ */
+function plainText(body: string): string {
+  let text = body.slice(0, 4000);
+  // The cut can split a tag, hence the unclosed one at the end.
+  if (/^\s*</.test(text)) text = text.replace(/<[^>]*(>|$)/g, " ");
+  return text.replace(/\s+/g, " ").trim();
+}
+
 /** A non-2xx API response. */
 export class AhApiError extends Error implements LogSafe {
   readonly status: number;
 
   /** body usually explains the error. */
   constructor(status: number, body: string) {
-    super(`AH API error ${status}: ${body}`);
+    super(`AH API error ${status}: ${plainText(body)}`);
     this.name = "AhApiError";
     this.status = status;
   }
@@ -97,10 +108,18 @@ export class AhClient {
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: AbortSignal.timeout(TIMEOUT_MS),
+      // Token requests carry the refresh token or login code in the body, which fetch would resend to a redirect target.
+      redirect: "error",
     });
     const text = await res.text();
-    if (!res.ok) throw new AhApiError(res.status, text.trim());
-    return (text ? JSON.parse(text) : undefined) as T;
+    if (!res.ok) throw new AhApiError(res.status, text);
+    if (!text) return undefined as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      // The parse error would quote the body, e.g. an HTML block page.
+      throw new Error(`AH sent a response that is not JSON (HTTP ${res.status})`);
+    }
   }
 
   /** Runs a GraphQL operation; returns its data or throws GraphQLError. */

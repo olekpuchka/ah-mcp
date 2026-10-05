@@ -8,6 +8,20 @@ import { log } from "../log.ts";
 import { TtlCache } from "./cache.ts";
 import type { BonusOffer, BonusPeriod, Member, Nutrient, Product } from "../ahapi/index.ts";
 
+/**
+ * Limits on what one call can write. Text that goes on the user's lists is read back into every
+ * later session, and quantities end up in paid orders, so neither is left unbounded.
+ */
+export const MAX_ITEMS = 50;
+export const MAX_QUANTITY = 99;
+export const quantitySchema = z.number().int().max(MAX_QUANTITY);
+export const itemText = z.string().max(100);
+export const productItems = z
+  .array(z.object({ product_id: z.number().int().describe("numeric product ID"), quantity: quantitySchema.describe("number of units") }))
+  .max(MAX_ITEMS);
+
+export const confirmInput = { confirm: z.string().describe('Must be "yes" to confirm') };
+
 /** State shared by tool handlers. */
 export interface ToolContext {
   session: Session;
@@ -72,8 +86,13 @@ export function structured(data: Record<string, unknown>, message?: string): Cal
   return { content: [{ type: "text", text: message ?? json }], structuredContent: JSON.parse(json) as Record<string, unknown> };
 }
 
+/** Errors can quote AH; enough of that to explain the error, not a whole error page. */
+const MAX_ERROR_LENGTH = 500;
+
 function errorResult(err: unknown): CallToolResult {
-  return { content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }], isError: true };
+  const message = err instanceof Error ? err.message : String(err);
+  const text = message.length > MAX_ERROR_LENGTH ? `${message.slice(0, MAX_ERROR_LENGTH)}…` : message;
+  return { content: [{ type: "text", text }], isError: true };
 }
 
 /** Registers a tool. Thrown errors become error results; every call is logged. */

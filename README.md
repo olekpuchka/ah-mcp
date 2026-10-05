@@ -139,14 +139,14 @@ Where the settings live differs per client; see its documentation. Clients with 
 
 Web apps such as ChatGPT and Claude.ai only connect to servers on the internet. Set one up first ([Deploying to a server](#deploying-to-a-server)). The endpoint is `https://your-server/mcp`.
 
-Clients that support OAuth log in to the server themselves: add the endpoint with OAuth (or automatic) authentication, and the client opens a login page on your server. Enter your `AH_MCP_TOKEN` there once; the client then gets its own tokens and renews them. Clients without OAuth send `AH_MCP_TOKEN` as an `Authorization: Bearer YOUR_TOKEN` header, or in the URL as `https://your-server/mcp?token=YOUR_TOKEN`.
+Clients log in with OAuth: add the endpoint with OAuth (or automatic) authentication, and the client opens a login page on your server. Enter your `AH_MCP_TOKEN` there once; the client then gets its own tokens and renews them. The server accepts only these OAuth tokens, not `AH_MCP_TOKEN` itself, so clients without OAuth support can't connect over HTTP; run them locally over [stdio](#local-clients-stdio) instead.
 
 **ChatGPT**: needs Developer mode (Plus, Pro, Business, Enterprise and Education). Open Settings → advanced settings, turn on Developer mode, and create a connector with the endpoint. Set authentication to **OAuth**.
 
 **Claude.ai**: Settings → Connectors → Add custom connector, then paste the endpoint and choose Connect.
 
 > [!IMPORTANT]
-> Anyone with `AH_MCP_TOKEN` can use your Albert Heijn account. Use a long random value (`openssl rand -hex 32`). Changing it also logs out every OAuth client. A token in a URL can end up in proxy logs, so prefer OAuth or the header.
+> Anyone with `AH_MCP_TOKEN` can log in and use your Albert Heijn account. Use a long random value (`openssl rand -hex 32`). Changing it logs out every client.
 
 ## Configuration
 
@@ -154,12 +154,12 @@ Settings are environment variables. They can also go in a `.env` file in the wor
 
 | Variable | Default | Description |
 |---|---|---|
-| `AH_REMOTE` | `false` | Don't open a browser on login. Use on servers (same as `--remote`). |
+| `AH_REMOTE` | `false` | Don't open a browser on login (same as `--remote`). Always on with `streamable-http`. |
 | `AH_TOKENS_PATH` | [per OS](#logging-in) | Where to store login tokens. |
 | `AH_MCP_HOST` | `127.0.0.1` | Interface the HTTP server listens on. Keep the default behind a reverse proxy. |
 | `AH_MCP_PORT` | `3000` | HTTP server port. |
 | `AH_MCP_BASE_URL` | `http://localhost:3000` | Public URL of the HTTP server. Set it on a server: OAuth clients are sent to this URL to log in, and for a non-local URL the localhost-only `Host` check is turned off so a reverse proxy can forward requests. |
-| `AH_MCP_TOKEN` | — | Secret for the HTTP transport, which doesn't start without it. Clients send it as `Authorization: Bearer …` or `?token=…`, or enter it on the OAuth login page. |
+| `AH_MCP_TOKEN` | — | Secret for the HTTP transport, at least 32 characters; the transport doesn't start without it. You enter it on the OAuth login page; it also signs the OAuth tokens. |
 | `AH_LOG_FILE` | — | Also append logs to this file. Logs always go to stderr. |
 
 Command-line flags:
@@ -172,7 +172,7 @@ node dist/index.js [--transport stdio|streamable-http] [--remote] [--version] [-
 
 ## Deploying to a server
 
-albert-heijn-mcp runs as a hardened systemd service behind a reverse proxy, installed from the latest release.
+albert-heijn-mcp runs as a hardened systemd service behind a reverse proxy, installed from npm.
 
 1. **Prepare the server.** Install Node.js 24 and create a service user:
 
@@ -187,10 +187,12 @@ albert-heijn-mcp runs as a hardened systemd service behind a reverse proxy, inst
    AH_MCP_TOKEN=<output of: openssl rand -hex 32>
    ```
 
+   Make it readable only by the service: `sudo chown albert-heijn-mcp: /home/albert-heijn-mcp/.env && sudo chmod 600 /home/albert-heijn-mcp/.env`.
+
 3. **Install it** with the [service unit](deploy/albert-heijn-mcp.service) that comes with the package (it runs in `--remote` mode):
 
    ```bash
-   sudo npm install --global --prefix /usr/local albert-heijn-mcp
+   sudo npm install --global --prefix /usr/local --ignore-scripts albert-heijn-mcp
    sudo install -m 644 /usr/local/lib/node_modules/albert-heijn-mcp/deploy/albert-heijn-mcp.service /etc/systemd/system/
    sudo systemctl daemon-reload
    sudo systemctl enable --now albert-heijn-mcp

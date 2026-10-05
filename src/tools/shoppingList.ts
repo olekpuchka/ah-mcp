@@ -9,7 +9,18 @@ import {
   productUrl,
   removeFromShoppingList,
 } from "../ahapi/index.ts";
-import { addAuthedTool, structured, text, type ToolContext, wrapError } from "./common.ts";
+import {
+  addAuthedTool,
+  confirmInput,
+  itemText,
+  MAX_ITEMS,
+  MAX_QUANTITY,
+  productItems,
+  structured,
+  text,
+  type ToolContext,
+  wrapError,
+} from "./common.ts";
 
 /** Replaces AH's "Server in order mode" error. */
 const ORDER_MODE_MESSAGE =
@@ -25,8 +36,6 @@ export async function listCall<T>(action: string, fn: () => Promise<T>): Promise
     throw isOrderMode(err) ? new Error(ORDER_MODE_MESSAGE) : wrapError(action, err);
   }
 }
-
-export const confirmInput = { confirm: z.string().describe('Must be "yes" to confirm') };
 
 export function registerShoppingListTools(server: McpServer, ctx: ToolContext): void {
   addAuthedTool(
@@ -84,14 +93,7 @@ export function registerShoppingListTools(server: McpServer, ctx: ToolContext): 
         "Pass an array of items, each with product_id (int) and quantity (int). " +
         "Returns confirmation listing the names of successfully added products.",
       input: {
-        items: z
-          .array(
-            z.object({
-              product_id: z.number().int().describe("numeric product ID"),
-              quantity: z.number().int().describe("number of units"),
-            }),
-          )
-          .describe('Items to add, e.g. [{"product_id": 123456, "quantity": 2}]'),
+        items: productItems.describe('Items to add, e.g. [{"product_id": 123456, "quantity": 2}]'),
       },
     },
     async (c, { items }) => {
@@ -103,6 +105,9 @@ export function registerShoppingListTools(server: McpServer, ctx: ToolContext): 
       }
       if (quantities.size === 0) {
         throw new Error("no valid items provided (each item needs product_id > 0 and quantity > 0)");
+      }
+      for (const [id, qty] of quantities) {
+        if (qty > MAX_QUANTITY) throw new Error(`product ${id} adds up to ${qty}; at most ${MAX_QUANTITY} per call`);
       }
       await listCall("failed to add items", () => addProductsToShoppingList(c, quantities));
 
@@ -130,7 +135,7 @@ export function registerShoppingListTools(server: McpServer, ctx: ToolContext): 
         "Use for reminders like 'verse bloemen', 'any good wine', or items not found in search. " +
         "Free-text items have no quantity: put amounts in the text, e.g. '2 bossen bloemen'.",
       input: {
-        name: z.string().describe("Free-text item description, e.g. 'verse bloemen', 'goede rode wijn'"),
+        name: itemText.describe("Free-text item description, e.g. 'verse bloemen', 'goede rode wijn'"),
       },
     },
     async (c, args) => {
@@ -154,10 +159,12 @@ export function registerShoppingListTools(server: McpServer, ctx: ToolContext): 
       input: {
         product_ids: z
           .array(z.number().int())
+          .max(MAX_ITEMS)
           .optional()
           .describe("Product IDs to remove, e.g. [123456, 789012]. Use for product items."),
         names: z
           .array(z.string())
+          .max(MAX_ITEMS)
           .optional()
           .describe('Free-text item names to remove, e.g. ["verse bloemen"]. Use for items without a product ID.'),
       },

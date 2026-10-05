@@ -1,9 +1,10 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 
+/** localhost, ::1 or a 127.x.x.x address; exact, so 127.0.0.1.example.com is not. */
 export function isLoopbackHost(host: string): boolean {
   const h = host.replace(/^\[|\]$/g, "");
-  return h === "localhost" || h === "::1" || /^127\./.test(h);
+  return h === "localhost" || h === "::1" || /^127(\.\d{1,3}){3}$/.test(h);
 }
 
 export const sha256 = (s: string) => createHash("sha256").update(s).digest();

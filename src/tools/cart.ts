@@ -14,15 +14,16 @@ import {
 import {
   addAuthedTool,
   cachedMember,
+  confirmInput,
   formatDate,
   formatTime,
   structured,
   orDefault,
+  quantitySchema,
   text,
   type ToolContext,
   wrapError,
 } from "./common.ts";
-import { confirmInput } from "./shoppingList.ts";
 import { orderView, viewOrder } from "./views.ts";
 
 /** AH accepts changes only to an active order, which its API can't create. */
@@ -84,12 +85,11 @@ export function registerCartTools(server: McpServer, ctx: ToolContext): void {
         "Set quantity=0 to remove the item (or use ah_remove_from_cart).",
       input: {
         product_id: z.number().int().describe("Numeric product ID"),
-        quantity: z.number().int().describe("New quantity (0 removes the item)"),
+        quantity: quantitySchema.min(0).describe("New quantity (0 removes the item)"),
       },
     },
     async (c, { product_id, quantity }) => {
       if (product_id <= 0) throw new Error("product_id is required");
-      if (quantity < 0) throw new Error("quantity must be >= 0");
       const order = await activeOrder(c);
       if (!order) throw new Error(NO_ACTIVE_ORDER);
       await setOrderItems(c, order.id, new Map([[product_id, quantity]]));

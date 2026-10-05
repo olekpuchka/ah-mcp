@@ -22,3 +22,7 @@ jobs:
         run: npm run lint
       - name: Build
         run: npm run build
+      - name: Validate server.json for the MCP Registry
+        run: |
+          curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
+          ./mcp-publisher validate

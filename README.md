@@ -2,6 +2,7 @@
 
 # ah-mcp
 
+[![npm](https://img.shields.io/npm/v/ah-mcp?color=cb3837&logo=npm)](https://www.npmjs.com/package/ah-mcp)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node.js 24](https://img.shields.io/badge/node-24%20LTS-339933?logo=node.js&logoColor=white)](.nvmrc)
 [![MCP](https://img.shields.io/badge/MCP-server-6E56CF)](https://modelcontextprotocol.io)
@@ -79,13 +80,9 @@ Ask in Dutch, English or any language your assistant speaks:
 
 **Requirements:** Node.js 24 (LTS) and an Albert Heijn account.
 
-Install the latest release:
+There's nothing to install: [connect a client](#connecting-a-client) with `npx -y ah-mcp`, which downloads and runs the [latest version](https://www.npmjs.com/package/ah-mcp), then ask it to log you in to Albert Heijn.
 
-```bash
-npm install --global https://github.com/olekpuchka/ah-mcp/releases/latest/download/ah-mcp.tgz
-```
-
-This adds the `ah-mcp` command. Then [connect a client](#connecting-a-client) and ask it to log you in to Albert Heijn. To update, run the same command again; to [build from source](#development), clone the repository instead.
+To install it permanently instead, run `npm install --global ah-mcp` and use the `ah-mcp` command. To [build from source](#development), clone the repository.
 
 ## Logging in
 
@@ -116,22 +113,23 @@ ah-mcp works with any MCP client. It runs locally over stdio, or on a server ove
 
 ### Local clients (stdio)
 
-Clients that start MCP servers as a local command run `ah-mcp`. Most of them take this JSON in their MCP settings:
+Clients that start MCP servers as a local command run `npx -y ah-mcp`. Most of them take this JSON in their MCP settings:
 
 ```json
 {
   "mcpServers": {
     "ah": {
-      "command": "ah-mcp"
+      "command": "npx",
+      "args": ["-y", "ah-mcp"]
     }
   }
 }
 ```
 
-Where the settings live differs per client; see its documentation. Clients with a CLI usually have an add command instead, e.g. `<client> mcp add ah -- ah-mcp`.
+Where the settings live differs per client; see its documentation. Clients with a CLI usually have an add command instead, e.g. `<client> mcp add ah -- npx -y ah-mcp`. ah-mcp is also listed in the [MCP Registry](https://registry.modelcontextprotocol.io), which some clients install from.
 
 > [!TIP]
-> Desktop apps don't load your shell profile, so they may not find `ah-mcp` or Node (common with nvm). Then use full paths: set `command` to the output of `which node` and `args` to `["<output of: which ah-mcp>"]`. For a source checkout, the argument is `/path/to/ah-mcp/dist/index.js`.
+> Desktop apps don't load your shell profile, so they may not find `npx` (common with nvm). Then set `command` to the output of `which npx`. For a source checkout, use `node` with the argument `/path/to/ah-mcp/dist/index.js`.
 
 ### Remote clients (Streamable HTTP)
 
@@ -186,7 +184,7 @@ ah-mcp runs as a hardened systemd service behind a reverse proxy, installed from
 3. **Install it** with the [service unit](deploy/ah-mcp.service) that comes with the package (it runs in `--remote` mode):
 
    ```bash
-   sudo npm install --global --prefix /usr/local https://github.com/olekpuchka/ah-mcp/releases/latest/download/ah-mcp.tgz
+   sudo npm install --global --prefix /usr/local ah-mcp
    sudo install -m 644 /usr/local/lib/node_modules/ah-mcp/deploy/ah-mcp.service /etc/systemd/system/
    sudo systemctl daemon-reload
    sudo systemctl enable --now ah-mcp
@@ -333,7 +331,7 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 Before deploying a change, run a quick check against a real account: log in, search for `melk`, add a product to your shopping list and remove it again, then view your cart and orders.
 
-To release, set the new version in `package.json`, merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. The [release workflow](.github/workflows/release.yml) checks that the tag matches the version, builds the package, and attaches it to the GitHub release as `ah-mcp.tgz`. The install command downloads the latest; for a specific version, use `releases/download/v1.2.3/ah-mcp.tgz`.
+To release, set the new version in `package.json` and in both places in [`server.json`](server.json), merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. The [release workflow](.github/workflows/release.yml) checks that the versions match, builds the package, attaches it to the GitHub release as `ah-mcp.tgz`, publishes it to npm, and updates the [MCP Registry](https://registry.modelcontextprotocol.io) entry. npm accepts the workflow through [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token is stored.
 
 ## Troubleshooting
 

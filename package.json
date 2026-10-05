@@ -1,7 +1,29 @@
 {
   "name": "ah-mcp",
-  "version": "1.2.1",
-  "description": "Model Context Protocol server for the Albert Heijn supermarket API",
+  "version": "1.3.0",
+  "description": "Unofficial MCP server for Albert Heijn: products, bonus deals, Allerhande recipes, your shopping list and orders in any AI assistant",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "albert-heijn",
+    "supermarket",
+    "groceries",
+    "shopping-list",
+    "recipes",
+    "allerhande",
+    "netherlands"
+  ],
+  "homepage": "https://github.com/olekpuchka/ah-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/olekpuchka/ah-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/olekpuchka/ah-mcp/issues"
+  },
+  "author": "Olek Puchka",
+  "mcpName": "io.github.olekpuchka/ah-mcp",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {

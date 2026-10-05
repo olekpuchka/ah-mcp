@@ -1,0 +1,39 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.olekpuchka/ah-mcp",
+  "title": "Albert Heijn",
+  "description": "Unofficial Albert Heijn server: products, bonus deals, recipes, shopping list, orders and receipts.",
+  "version": "1.3.0",
+  "repository": {
+    "url": "https://github.com/olekpuchka/ah-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/olekpuchka/ah-mcp#readme",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/olekpuchka/ah-mcp/main/assets/icon.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "128x128"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "ah-mcp",
+      "version": "1.3.0",
+      "runtimeHint": "npx",
+      "runtimeArguments": [
+        {
+          "type": "positional",
+          "value": "-y"
+        }
+      ],
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

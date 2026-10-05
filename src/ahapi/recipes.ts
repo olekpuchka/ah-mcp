@@ -29,7 +29,8 @@ export interface Recipe {
   cuisines?: string[];
   servings: { number: number; type: string };
   rating?: { average?: number | null; count?: number | null } | null;
-  ingredients: { text: string }[];
+  /** text is the full line ("2 middelgrote uien"); name the ingredient alone ("middelgrote ui"). */
+  ingredients: { text: string; name: string }[];
   preparation?: { steps?: string[] } | null;
   nutritions?: Record<"energy" | "carbohydrates" | "fat" | "protein", Nutrition | null> | null;
 }
@@ -73,7 +74,7 @@ export async function getRecipe(c: AhClient, id: number, servings?: number): Pro
     id title description href cookTime nutriScore courses cuisines
     servings { number type }
     rating { average count }
-    ingredients { text }
+    ingredients { text name { singular } }
     preparation { steps }
     nutritions {
       energy { value unit name } carbohydrates { value unit name }
@@ -81,12 +82,17 @@ export async function getRecipe(c: AhClient, id: number, servings?: number): Pro
     }
   }
 }`;
-  const { recipe: r } = await c.graphql<{ recipe: Recipe }>(query, { id, servings });
+  const { recipe: r } = await c.graphql<{
+    recipe: Omit<Recipe, "ingredients"> & { ingredients: { text: string; name?: { singular?: string } | null }[] };
+  }>(query, { id, servings });
   return {
     ...r,
     title: decodeEntities(r.title),
     description: r.description && decodeEntities(r.description),
-    ingredients: r.ingredients.map((i) => ({ text: decodeEntities(i.text) })),
+    ingredients: r.ingredients.map((i) => ({
+      text: decodeEntities(i.text),
+      name: decodeEntities(i.name?.singular || i.text),
+    })),
     preparation: r.preparation && { steps: r.preparation.steps?.map(decodeEntities) },
   };
 }

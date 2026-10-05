@@ -55,6 +55,8 @@ interface ToolDef<Shape extends z.ZodRawShape> {
   kind: ToolKind;
   description: string;
   input?: Shape;
+  /** Shape of the structured result of a successful call; clients get it as outputSchema. */
+  output?: z.ZodRawShape;
 }
 
 type Args<Shape extends z.ZodRawShape> = z.infer<z.ZodObject<Shape>>;
@@ -63,8 +65,11 @@ export function text(value: string): CallToolResult {
   return { content: [{ type: "text", text: value }] };
 }
 
-export function json(value: unknown): CallToolResult {
-  return text(JSON.stringify(value, null, 2));
+/** A result with structured data, also sent as JSON text for clients without structured output; message replaces the text. */
+export function structured(data: Record<string, unknown>, message?: string): CallToolResult {
+  // AH sends null for some missing values; as "absent" they fit the optional fields of the output schemas.
+  const json = JSON.stringify(data, (_key, value: unknown) => (value === null ? undefined : value), 2);
+  return { content: [{ type: "text", text: message ?? json }], structuredContent: JSON.parse(json) as Record<string, unknown> };
 }
 
 function errorResult(err: unknown): CallToolResult {
@@ -94,6 +99,7 @@ export function addTool<Shape extends z.ZodRawShape>(
       title: def.title,
       description: def.description,
       inputSchema: def.input ?? ({} as Shape),
+      outputSchema: def.output,
       annotations: annotations(def.title, def.kind),
     },
     // Typed via Args<Shape> above; the SDK's generic callback type doesn't infer here.

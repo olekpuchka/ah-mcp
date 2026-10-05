@@ -2,8 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getFulfillments, getOrderDetails, type Order, productUrl } from "../ahapi/index.ts";
 import { log } from "../log.ts";
-import { addAuthedTool, json, nonFatal, orDefault, parallel, text, type ToolContext, withRetry } from "./common.ts";
-import { viewOrder } from "./views.ts";
+import { addAuthedTool, nonFatal, orDefault, parallel, structured, type ToolContext, withRetry } from "./common.ts";
+import { orderView, viewOrder } from "./views.ts";
 
 /** Status of a cancelled order; AH reports statuses in Dutch ("Geannuleerd"). */
 const CANCELLED = /geannuleerd|cancel/i;
@@ -16,6 +16,19 @@ export function registerOrderTools(server: McpServer, ctx: ToolContext): void {
       name: "ah_get_orders",
       title: "Albert Heijn: Orders",
       kind: "readOnly",
+      output: {
+        orders: z.array(
+          z.object({
+            id: z.number(),
+            date: z.string().optional(),
+            time_window: z.string().optional(),
+            total_price: z.number().optional(),
+            status: z.string().optional(),
+            shopping_type: z.string().optional(),
+            modifiable: z.boolean().optional(),
+          }),
+        ),
+      },
       description:
         "List Albert Heijn online delivery orders. " +
         "By default returns upcoming orders (with a modifiable flag); set past=true for delivered orders. " +
@@ -28,17 +41,20 @@ export function registerOrderTools(server: McpServer, ctx: ToolContext): void {
     },
     async (c, { past, limit }) => {
       const fulfillments = await getFulfillments(c, Boolean(past));
-      if (fulfillments.length === 0) return text(past ? "No past orders found." : "No upcoming orders.");
-      return json(
-        fulfillments.slice(0, orDefault(limit, 10)).map((f) => ({
-          id: f.orderId,
-          date: f.dateDisplay || f.date || undefined,
-          time_window: f.timeDisplay || undefined,
-          total_price: f.totalPrice ?? undefined,
-          status: f.status,
-          shopping_type: f.shoppingType || undefined,
-          modifiable: past ? undefined : f.modifiable,
-        })),
+      const empty = past ? "No past orders found." : "No upcoming orders.";
+      return structured(
+        {
+          orders: fulfillments.slice(0, orDefault(limit, 10)).map((f) => ({
+            id: f.orderId,
+            date: f.dateDisplay || f.date || undefined,
+            time_window: f.timeDisplay || undefined,
+            total_price: f.totalPrice ?? undefined,
+            status: f.status,
+            shopping_type: f.shoppingType || undefined,
+            modifiable: past ? undefined : f.modifiable,
+          })),
+        },
+        fulfillments.length ? undefined : empty,
       );
     },
   );
@@ -50,6 +66,7 @@ export function registerOrderTools(server: McpServer, ctx: ToolContext): void {
       name: "ah_get_order_details",
       title: "Albert Heijn: Order Details",
       kind: "readOnly",
+      output: orderView.shape,
       description:
         "Get the full item list for a specific Albert Heijn delivery order by its ID. " +
         "Returns all products with names, quantities, and prices. " +
@@ -58,7 +75,7 @@ export function registerOrderTools(server: McpServer, ctx: ToolContext): void {
     },
     async (c, { order_id }) => {
       if (order_id <= 0) throw new Error("order_id is required");
-      return json(viewOrder(await getOrderDetails(c, order_id)));
+      return structured(viewOrder(await getOrderDetails(c, order_id)));
     },
   );
 
@@ -69,6 +86,17 @@ export function registerOrderTools(server: McpServer, ctx: ToolContext): void {
       name: "ah_get_frequent_items",
       title: "Albert Heijn: Frequently Ordered Items",
       kind: "readOnly",
+      output: {
+        products: z.array(
+          z.object({
+            product_name: z.string(),
+            product_id: z.number(),
+            order_count: z.number(),
+            last_ordered_date: z.string().optional(),
+            url: z.string(),
+          }),
+        ),
+      },
       description:
         "Get frequently ordered products by analysing order history. " +
         "Fetches all fulfillments, expands each order's items, counts per product, " +
@@ -131,8 +159,8 @@ export function registerOrderTools(server: McpServer, ctx: ToolContext): void {
           }
         }
       });
-      return json(
-        [...stats.values()]
+      return structured({
+        products: [...stats.values()]
           .filter((s) => s.order_count >= minCount)
           .sort((a, b) => b.order_count - a.order_count)
           .map((s) => ({
@@ -140,7 +168,7 @@ export function registerOrderTools(server: McpServer, ctx: ToolContext): void {
             url: productUrl(s.product_id, s.product_name),
             last_ordered_date: s.last_ordered_date || undefined,
           })),
-      );
+      });
     },
   );
 }

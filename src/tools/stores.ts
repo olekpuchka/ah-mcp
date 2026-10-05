@@ -1,7 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { type AhClient, getBargains, productUrl, searchStores } from "../ahapi/index.ts";
-import { addAuthedTool, cachedMember, formatDate, json, orDefault, text, type ToolContext, wrapError } from "./common.ts";
+import { addAuthedTool, cachedMember, formatDate, orDefault, structured, type ToolContext, wrapError } from "./common.ts";
+
+const str = z.string().optional();
 
 export function registerStoreTools(server: McpServer, ctx: ToolContext): void {
   addAuthedTool(
@@ -11,6 +13,11 @@ export function registerStoreTools(server: McpServer, ctx: ToolContext): void {
       name: "ah_search_stores",
       title: "Albert Heijn: Search Stores",
       kind: "readOnly",
+      output: {
+        stores: z.array(
+          z.object({ id: z.number(), name: z.string(), type: str, street: str, city: str, postal_code: str }),
+        ),
+      },
       description:
         "Find Albert Heijn stores near a Dutch postal code. " +
         "If no postal_code is given, automatically uses the address from the member profile. " +
@@ -26,16 +33,18 @@ export function registerStoreTools(server: McpServer, ctx: ToolContext): void {
       const postalCode = postal_code || (await memberPostalCode(ctx, c));
       if (!postalCode) throw new Error("no postal_code provided and member profile has no address on file");
       const stores = await searchStores(c, postalCode);
-      if (stores.length === 0) return text(`No AH stores found near ${postalCode}.`);
-      return json(
-        stores.map((s) => ({
-          id: s.id,
-          name: s.name,
-          type: s.storeType || undefined,
-          street: [s.address?.street, s.address?.houseNumber].filter(Boolean).join(" ") || undefined,
-          city: s.address?.city || undefined,
-          postal_code: s.address?.postalCode || undefined,
-        })),
+      return structured(
+        {
+          stores: stores.map((s) => ({
+            id: s.id,
+            name: s.name,
+            type: s.storeType || undefined,
+            street: [s.address?.street, s.address?.houseNumber].filter(Boolean).join(" ") || undefined,
+            city: s.address?.city || undefined,
+            postal_code: s.address?.postalCode || undefined,
+          })),
+        },
+        stores.length ? undefined : `No AH stores found near ${postalCode}.`,
       );
     },
   );
@@ -47,6 +56,23 @@ export function registerStoreTools(server: McpServer, ctx: ToolContext): void {
       name: "ah_get_last_chance_items",
       title: "Albert Heijn: Last-Chance Items",
       kind: "readOnly",
+      output: {
+        items: z.array(
+          z.object({
+            id: z.number(),
+            title: z.string(),
+            url: z.string(),
+            brand: str,
+            category: str,
+            markdown_type: str,
+            discount_percentage: z.number().optional(),
+            expiration_date: str,
+            stock: z.number().optional(),
+            price_was: str,
+            price_now: str,
+          }),
+        ),
+      },
       description:
         "Get last-chance / vandaag-af / clearance items from an Albert Heijn store. " +
         "Requires a store_id (use ah_search_stores to find stores, or provide postal_code to find the nearest store). " +
@@ -69,8 +95,8 @@ export function registerStoreTools(server: McpServer, ctx: ToolContext): void {
         );
       }
       const bargains = (await getBargains(c, storeId)).slice(0, orDefault(args.limit, 20));
-      return json(
-        bargains.map((b) => ({
+      return structured({
+        items: bargains.map((b) => ({
           id: b.productId,
           title: b.title,
           url: productUrl(b.productId, b.title),
@@ -83,7 +109,7 @@ export function registerStoreTools(server: McpServer, ctx: ToolContext): void {
           price_was: b.priceWas || undefined,
           price_now: b.priceNow ?? undefined,
         })),
-      );
+      });
     },
   );
 }

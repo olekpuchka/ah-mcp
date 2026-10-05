@@ -1,17 +1,57 @@
+import { z } from "zod";
 import { type FavoriteList, type Nutrient, type Order, type Product, productImage, productPrices, productUrl } from "../ahapi/index.ts";
 
+// Each view has a Zod schema, used as (part of) a tool's outputSchema; the types derive from it.
+
+const num = z.number().optional();
+const str = z.string().optional();
+
 /** Product in search and list results. */
-interface ProductSummary {
-  id: number;
-  title: string;
-  url: string;
-  price: number;
-  bonus_price?: number;
-  unit?: string;
-  is_bonus: boolean;
-  bonus_mechanism?: string;
-  image_url?: string;
-}
+export const productSummary = z.object({
+  id: z.number(),
+  title: z.string(),
+  url: z.string(),
+  price: z.number(),
+  bonus_price: num,
+  unit: str,
+  is_bonus: z.boolean(),
+  bonus_mechanism: str,
+  image_url: str,
+});
+type ProductSummary = z.infer<typeof productSummary>;
+
+/** Product in ah_get_products. */
+export const productDetail = z.object({
+  id: z.number(),
+  title: z.string(),
+  url: z.string(),
+  brand: str,
+  category: str,
+  description: str,
+  price: z.number(),
+  bonus_price: num,
+  unit_size: str,
+  unit_price_description: str,
+  is_bonus: z.boolean(),
+  bonus_mechanism: str,
+  nutri_score: str,
+  is_available: z.boolean(),
+  property_icons: z.array(z.string()).optional(),
+  nutritional_info: z.array(z.object({ type: z.string(), name: z.string(), value: z.string() })).optional(),
+  image_url: str,
+});
+
+export const orderView = z.object({
+  id: z.number(),
+  state: str,
+  items: z.array(
+    z.object({ product_id: z.number(), name: str, url: z.string(), quantity: z.number(), price: num }),
+  ),
+  total_price: num,
+  total_discount: num,
+});
+
+export const favoriteListView = z.object({ id: z.string(), name: z.string(), item_count: z.number(), updated_at: str });
 
 export function summarizeProduct(p: Product): ProductSummary {
   const { regular, bonus } = productPrices(p);
@@ -28,8 +68,7 @@ export function summarizeProduct(p: Product): ProductSummary {
   };
 }
 
-/** Product in ah_get_products. */
-export function detailProduct(p: Product, nutrition: Nutrient[] | undefined) {
+export function detailProduct(p: Product, nutrition: Nutrient[] | undefined): z.infer<typeof productDetail> {
   const { regular, bonus } = productPrices(p);
   return {
     id: p.webshopId,
@@ -52,7 +91,7 @@ export function detailProduct(p: Product, nutrition: Nutrient[] | undefined) {
   };
 }
 
-export function viewOrder(o: Order) {
+export function viewOrder(o: Order): z.infer<typeof orderView> {
   return {
     id: o.id,
     state: o.state || undefined,
@@ -68,6 +107,6 @@ export function viewOrder(o: Order) {
   };
 }
 
-export function viewFavoriteList(l: FavoriteList) {
+export function viewFavoriteList(l: FavoriteList): z.infer<typeof favoriteListView> {
   return { id: l.id, name: l.name, item_count: l.itemCount, updated_at: l.updatedAt };
 }

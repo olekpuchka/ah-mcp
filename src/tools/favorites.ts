@@ -8,9 +8,9 @@ import {
   GraphQLError,
   removeFromFavoriteList,
 } from "../ahapi/index.ts";
-import { addAuthedTool, json, orDefault, text, type ToolContext, withRetry } from "./common.ts";
+import { addAuthedTool, orDefault, structured, text, type ToolContext, withRetry } from "./common.ts";
 import { confirmInput } from "./shoppingList.ts";
-import { viewFavoriteList } from "./views.ts";
+import { favoriteListView, viewFavoriteList } from "./views.ts";
 
 const listId = z.string().describe("Favorite list ID from ah_get_favorite_lists");
 
@@ -22,14 +22,14 @@ export function registerFavoriteListTools(server: McpServer, ctx: ToolContext): 
       name: "ah_get_favorite_lists",
       title: "Albert Heijn: View Favourite Lists",
       kind: "readOnly",
+      output: { lists: z.array(favoriteListView) },
       description:
         "List all Albert Heijn favorite/saved shopping lists with their names and item counts. " +
         "Use the returned list ID with ah_add_to_favorite_list, ah_remove_from_favorite_list or ah_delete_favorite_list.",
     },
     async (c) => {
       const lists = await getFavoriteLists(c);
-      if (lists.length === 0) return text("You have no favorite lists.");
-      return json(lists.map(viewFavoriteList));
+      return structured({ lists: lists.map(viewFavoriteList) }, lists.length ? undefined : "You have no favorite lists.");
     },
   );
 
@@ -87,6 +87,7 @@ export function registerFavoriteListTools(server: McpServer, ctx: ToolContext): 
       name: "ah_create_favorite_list",
       title: "Albert Heijn: Create Favourite List",
       kind: "additive",
+      output: favoriteListView.shape,
       description:
         "Create a new, empty Albert Heijn favorite list with the given name; AH drops some punctuation, such as '-'. " +
         "Returns its id; add products with ah_add_to_favorite_list.",
@@ -95,7 +96,7 @@ export function registerFavoriteListTools(server: McpServer, ctx: ToolContext): 
     async (c, args) => {
       const name = args.name.trim();
       if (!name) throw new Error("name is required");
-      return json(viewFavoriteList(await createFavoriteList(c, name)));
+      return structured(viewFavoriteList(await createFavoriteList(c, name)));
     },
   );
 

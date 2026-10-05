@@ -16,14 +16,14 @@ import {
   cachedMember,
   formatDate,
   formatTime,
-  json,
+  structured,
   orDefault,
   text,
   type ToolContext,
   wrapError,
 } from "./common.ts";
 import { confirmInput } from "./shoppingList.ts";
-import { viewOrder } from "./views.ts";
+import { orderView, viewOrder } from "./views.ts";
 
 /** AH accepts changes only to an active order, which its API can't create. */
 const NO_ACTIVE_ORDER =
@@ -49,6 +49,7 @@ export function registerCartTools(server: McpServer, ctx: ToolContext): void {
       name: "ah_get_cart",
       title: "Albert Heijn: View Order Cart",
       kind: "readOnly",
+      output: { order: orderView.optional() },
       description:
         "View the items in the active Albert Heijn delivery order (the order cart). " +
         "An order only exists after the user has chosen a delivery or pick-up slot; " +
@@ -58,12 +59,13 @@ export function registerCartTools(server: McpServer, ctx: ToolContext): void {
     async (c) => {
       const order = await activeOrder(c);
       if (!order) {
-        return text(
+        return structured(
+          {},
           "There is no active delivery order, so the order cart is empty. " +
             "Products the user is collecting are on the shopping list (ah_get_shopping_list).",
         );
       }
-      return json(viewOrder(order));
+      return structured({ order: viewOrder(order) });
     },
   );
 
@@ -148,6 +150,10 @@ export function registerCartTools(server: McpServer, ctx: ToolContext): void {
       name: "ah_get_delivery_slots",
       title: "Albert Heijn: Delivery Slots",
       kind: "readOnly",
+      output: {
+        postal_code: z.string(),
+        days: z.array(z.object({ date: z.string(), windows: z.array(z.string()) })),
+      },
       description:
         "List the delivery time windows Albert Heijn offers at the member's address, per day (Dutch time). " +
         "Booking a slot is only possible in the AH app or on ah.nl; this shows when delivery is possible. " +
@@ -160,14 +166,16 @@ export function registerCartTools(server: McpServer, ctx: ToolContext): void {
       const { address } = await cachedMember(ctx, c);
       if (!address) throw new Error("the member profile has no delivery address; add one in the AH app");
       const days = (await getDeliverySlots(c, address)).filter((d) => d.slots.length > 0);
-      if (days.length === 0) return text(`AH offers no delivery slots for ${address.postalCode} right now.`);
-      return json({
-        postal_code: address.postalCode,
-        days: days.slice(0, orDefault(args.days, 7)).map((d) => ({
-          date: formatDate(d.date, false),
-          windows: d.slots.map((s) => `${formatTime(s.start)}-${formatTime(s.end)}`),
-        })),
-      });
+      return structured(
+        {
+          postal_code: address.postalCode,
+          days: days.slice(0, orDefault(args.days, 7)).map((d) => ({
+            date: formatDate(d.date, false),
+            windows: d.slots.map((s) => `${formatTime(s.start)}-${formatTime(s.end)}`),
+          })),
+        },
+        days.length ? undefined : `AH offers no delivery slots for ${address.postalCode} right now.`,
+      );
     },
   );
 }

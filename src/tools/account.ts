@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getMember, LOGIN_URL, type Member } from "../ahapi/index.ts";
 import { extractCode } from "../auth/login.ts";
 import { SessionExpiredError } from "../auth/session.ts";
-import { addAuthedTool, addTool, isUnauthorized, json, text, type ToolContext } from "./common.ts";
+import { addAuthedTool, addTool, isUnauthorized, structured, text, type ToolContext } from "./common.ts";
 
 export function registerAccountTools(server: McpServer, ctx: ToolContext): void {
   addTool(
@@ -83,6 +83,7 @@ export function registerAccountTools(server: McpServer, ctx: ToolContext): void 
       name: "ah_get_member_profile",
       title: "Albert Heijn: Member Profile",
       kind: "readOnly",
+      output: { name: z.string(), email: z.string().optional(), bonus_card_number: z.string().optional() },
       description:
         "Get your Albert Heijn member profile. " +
         "Returns name, email (masked), and bonus_card_number (last 4 digits only).",
@@ -90,7 +91,7 @@ export function registerAccountTools(server: McpServer, ctx: ToolContext): void 
     async (c) => {
       const m = await getMember(c);
       const card = m.bonusCardNumber;
-      return json({
+      return structured({
         name: fullName(m),
         email: maskEmail(m.email) || undefined,
         bonus_card_number: card ? (card.length > 4 ? `****${card.slice(-4)}` : card) : undefined,

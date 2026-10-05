@@ -11,10 +11,21 @@ import {
   productUrl,
 } from "../ahapi/index.ts";
 import { log } from "../log.ts";
-import { addAuthedTool, json, nonFatal, orDefault, parallel, text, type ToolContext, withRetry, wrapError } from "./common.ts";
-import { summarizeProduct } from "./views.ts";
+import { addAuthedTool, nonFatal, orDefault, parallel, structured, type ToolContext, withRetry, wrapError } from "./common.ts";
+import { productSummary, summarizeProduct } from "./views.ts";
 
 const period = z.enum(["current", "next"]).optional();
+
+const offerView = z.object({
+  id: z.number().optional(),
+  bonus_segment_id: z.string().optional(),
+  title: z.string(),
+  url: z.string().optional(),
+  original_price: z.number().optional(),
+  bonus_price: z.number().optional(),
+  discount_percentage: z.number().optional(),
+  bonus_mechanism: z.string().optional(),
+});
 
 export function registerBonusTools(server: McpServer, ctx: ToolContext): void {
   addAuthedTool(
@@ -46,14 +57,15 @@ export function registerBonusTools(server: McpServer, ctx: ToolContext): void {
           .optional()
           .describe("Only offers on products the user bought before"),
       },
+      output: { offers: z.array(offerView) },
     },
     async (c, args) => {
       const p = await bonusPeriod(ctx, c, args.period);
-      if (typeof p === "string") return text(p);
+      if (typeof p === "string") return structured({ offers: [] }, p);
       const limit = orDefault(args.limit, 20);
       const query = (args.query ?? "").toLowerCase();
 
-      const offers: Record<string, unknown>[] = [];
+      const offers: z.infer<typeof offerView>[] = [];
       const add = (o: { id?: number; segment?: string; title: string; was?: number; now?: number; mechanism?: string | null }) => {
         if (offers.length >= limit || (query && !o.title.toLowerCase().includes(query))) return;
         const discount = o.was && o.now ? Math.round((1 - o.now / o.was) * 100) : undefined;
@@ -80,7 +92,7 @@ export function registerBonusTools(server: McpServer, ctx: ToolContext): void {
           add({ segment: g.id, title: g.segmentDescription, was: g.exampleFromPrice, now: g.exampleForPrice, mechanism: g.discountDescription });
         }
       }
-      return json(offers);
+      return structured({ offers });
     },
   );
 
@@ -101,12 +113,13 @@ export function registerBonusTools(server: McpServer, ctx: ToolContext): void {
         segment_id: z.string().describe("Bonus segment ID from the bonus_segment_id field in ah_get_bonus_offers"),
         period: period.describe("Bonus week of the offer: 'current' (default) or 'next'"),
       },
+      output: { products: z.array(productSummary) },
     },
     async (c, args) => {
       if (!args.segment_id) throw new Error("segment_id is required");
       const p = await bonusPeriod(ctx, c, args.period);
-      if (typeof p === "string") return text(p);
-      return json((await getBonusGroupProducts(c, args.segment_id, p)).map(summarizeProduct));
+      if (typeof p === "string") return structured({ products: [] }, p);
+      return structured({ products: (await getBonusGroupProducts(c, args.segment_id, p)).map(summarizeProduct) });
     },
   );
 }

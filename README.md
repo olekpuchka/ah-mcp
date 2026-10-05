@@ -35,7 +35,7 @@ Ask in Dutch, English or any language your assistant speaks:
 
 **Plan meals**
 
-> *"Find a vegetarian Allerhande recipe under 30 minutes for two, and put the ingredients on my shopping list."*
+> *"Find a vegetarian Allerhande recipe under 30 minutes for two, and put the ingredients on my shopping list. I already have olive oil and salt."*
 
 > *"Scale the panlasagne recipe to six people and tell me how much salmon I need."*
 
@@ -208,7 +208,7 @@ The service can write only to `/home/ah-mcp`, where it keeps its tokens. If you 
 
 Read-only tools are marked as such, so clients can run them without asking. Tools that remove data are marked destructive, so clients ask for confirmation first.
 
-Products and recipes in tool results include a `url` to their page on ah.nl, and the server asks the assistant to link their names to it.
+Tools that return data also return it as [structured output](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#structured-content) with a declared schema, for clients that use it. Products and recipes in tool results include a `url` to their page on ah.nl, and the server asks the assistant to link their names to it.
 
 <details open>
 <summary><b>Account</b></summary>
@@ -243,6 +243,7 @@ Products and recipes in tool results include a `url` to their page on ah.nl, and
 |---|---|
 | `ah_search_recipes` | Search Allerhande recipes; Dutch terms work best. |
 | `ah_get_recipe` | Ingredients, steps, and nutrition per serving. `servings` scales the ingredients. |
+| `ah_add_recipe_to_shopping_list` | Match a recipe's ingredients to products and add them to the list in one step. `skip` leaves out what you have; `dry_run=true` previews the matches. |
 
 </details>
 

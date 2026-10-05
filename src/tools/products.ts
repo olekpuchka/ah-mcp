@@ -10,8 +10,8 @@ import {
   type SearchSort,
   searchProducts,
 } from "../ahapi/index.ts";
-import { addAuthedTool, json, nonFatal, orDefault, parallel, text, type ToolContext, withRetry } from "./common.ts";
-import { detailProduct, summarizeProduct } from "./views.ts";
+import { addAuthedTool, nonFatal, orDefault, parallel, structured, type ToolContext, withRetry } from "./common.ts";
+import { detailProduct, productDetail, productSummary, summarizeProduct } from "./views.ts";
 
 const MAX_QUERIES = 10;
 const MAX_PRODUCT_IDS = 20;
@@ -92,6 +92,9 @@ export function registerProductTools(server: McpServer, ctx: ToolContext): void 
           .optional()
           .describe("Result order (default relevance)"),
       },
+      output: {
+        searches: z.array(z.object({ query: z.string(), results: z.array(productSummary), error: z.string().optional() })),
+      },
     },
     async (c, { queries, limit, bonus, filters, sort }) => {
       const qs = queries.filter(Boolean).slice(0, MAX_QUERIES);
@@ -119,7 +122,7 @@ export function registerProductTools(server: McpServer, ctx: ToolContext): void 
           },
         );
       });
-      return json(results);
+      return structured({ searches: results });
     },
   );
 
@@ -141,16 +144,19 @@ export function registerProductTools(server: McpServer, ctx: ToolContext): void 
           .describe("Product IDs from ah_search_products, e.g. [123456] or [123456, 789012] (max 20)"),
         include_nutritional_info: z.boolean().optional().describe("Include nutritional values (default false)"),
       },
+      output: {
+        products: z.array(z.union([productDetail, z.object({ id: z.number(), error: z.string() })])),
+      },
     },
     async (c, { product_ids, include_nutritional_info }) => {
       const ids = product_ids.filter((id) => id > 0).slice(0, MAX_PRODUCT_IDS);
       if (ids.length === 0) throw new Error("provide at least one product ID");
 
-      const results: unknown[] = new Array(ids.length);
+      const results: (z.infer<typeof productDetail> | { id: number; error: string })[] = new Array(ids.length);
       await parallel(ids.length, 5, async (i) => {
         const id = ids[i]!;
         const key = String(id);
-        results[i] = await nonFatal<unknown>(
+        results[i] = await nonFatal<z.infer<typeof productDetail> | { id: number; error: string }>(
           async () => {
             const p = await ctx.products.getOrLoad(key, () => withRetry("ah_get_products", () => getProduct(c, id)));
             const nutrition = include_nutritional_info
@@ -161,7 +167,7 @@ export function registerProductTools(server: McpServer, ctx: ToolContext): void 
           (err) => ({ id, error: (err as Error).message }),
         );
       });
-      return json(results);
+      return structured({ products: results });
     },
   );
 
@@ -180,6 +186,7 @@ export function registerProductTools(server: McpServer, ctx: ToolContext): void 
         product_id: z.number().int().describe("Product ID, e.g. from ah_search_products or ah_get_shopping_list"),
         limit: z.number().int().optional().describe("Maximum number of alternatives (default 10, max 30)"),
       },
+      output: { products: z.array(productSummary) },
     },
     async (c, args) => {
       if (args.product_id <= 0) throw new Error("product_id is required");
@@ -187,14 +194,14 @@ export function registerProductTools(server: McpServer, ctx: ToolContext): void 
       const alternatives = await ctx.searches.getOrLoad(`alternatives:${args.product_id}:${size}`, () =>
         withRetry("ah_get_product_alternatives", () => getProductAlternatives(c, args.product_id, size)),
       );
-      if (alternatives.length === 0) return text(`AH suggests no alternatives for product ${args.product_id}.`);
-      return json(alternatives.map(summarizeProduct));
+      const message = alternatives.length ? undefined : `AH suggests no alternatives for product ${args.product_id}.`;
+      return structured({ products: alternatives.map(summarizeProduct) }, message);
     },
   );
 }
 
 /** Cached, retried product search. */
-function search(ctx: ToolContext, c: AhClient, query: string, limit: number, opts: SearchOptions): Promise<Product[]> {
+export function search(ctx: ToolContext, c: AhClient, query: string, limit: number, opts: SearchOptions): Promise<Product[]> {
   // most_bought orders by this account's purchases, so it is cached per login.
   const account = opts.sort === "PURCHASE_FREQUENCY" ? c.token : undefined;
   return ctx.searches.getOrLoad(JSON.stringify([query, limit, opts, account]), () =>

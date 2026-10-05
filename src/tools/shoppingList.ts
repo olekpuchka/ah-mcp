@@ -9,7 +9,7 @@ import {
   productUrl,
   removeFromShoppingList,
 } from "../ahapi/index.ts";
-import { addAuthedTool, json, text, type ToolContext, wrapError } from "./common.ts";
+import { addAuthedTool, structured, text, type ToolContext, wrapError } from "./common.ts";
 
 /** Replaces AH's "Server in order mode" error. */
 const ORDER_MODE_MESSAGE =
@@ -18,7 +18,7 @@ const ORDER_MODE_MESSAGE =
   "Use ah_get_cart, ah_update_cart_item and ah_remove_from_cart to view or change the order";
 
 /** Runs a shopping-list call; errors are prefixed with action, or replaced with ORDER_MODE_MESSAGE. */
-async function listCall<T>(action: string, fn: () => Promise<T>): Promise<T> {
+export async function listCall<T>(action: string, fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (err) {
@@ -36,6 +36,18 @@ export function registerShoppingListTools(server: McpServer, ctx: ToolContext): 
       name: "ah_get_shopping_list",
       title: "Albert Heijn: View Shopping List",
       kind: "readOnly",
+      output: {
+        items: z.array(
+          z.object({
+            position: z.number(),
+            name: z.string(),
+            product_id: z.number().optional(),
+            url: z.string().optional(),
+            quantity: z.number(),
+            checked: z.boolean().optional(),
+          }),
+        ),
+      },
       description:
         "Get the contents of the Albert Heijn shopping list (boodschappenlijst). " +
         "In the AH app this is the basket the user fills while shopping; choosing a delivery slot moves its products " +
@@ -44,16 +56,18 @@ export function registerShoppingListTools(server: McpServer, ctx: ToolContext): 
     },
     async (c) => {
       const items = await listCall("failed to get shopping list", () => getShoppingList(c));
-      if (items.length === 0) return text("Your shopping list is empty.");
-      return json(
-        items.map((it) => ({
-          position: it.position,
-          name: it.name,
-          product_id: it.productId || undefined,
-          url: it.productId ? productUrl(it.productId, it.name) : undefined,
-          quantity: it.quantity,
-          checked: it.checked || undefined,
-        })),
+      return structured(
+        {
+          items: items.map((it) => ({
+            position: it.position,
+            name: it.name,
+            product_id: it.productId || undefined,
+            url: it.productId ? productUrl(it.productId, it.name) : undefined,
+            quantity: it.quantity,
+            checked: it.checked || undefined,
+          })),
+        },
+        items.length ? undefined : "Your shopping list is empty.",
       );
     },
   );

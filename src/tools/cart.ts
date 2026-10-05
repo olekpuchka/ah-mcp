@@ -3,8 +3,25 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { type AhClient, getActiveOrder, isNoActiveOrder, type Order, setOrderItems } from "../ahapi/index.ts";
-import { addAuthedTool, json, text, type ToolContext, wrapError } from "./common.ts";
+import {
+  type AhClient,
+  getActiveOrder,
+  getDeliverySlots,
+  isNoActiveOrder,
+  type Order,
+  setOrderItems,
+} from "../ahapi/index.ts";
+import {
+  addAuthedTool,
+  cachedMember,
+  formatDate,
+  formatTime,
+  json,
+  orDefault,
+  text,
+  type ToolContext,
+  wrapError,
+} from "./common.ts";
 import { confirmInput } from "./shoppingList.ts";
 import { viewOrder } from "./views.ts";
 
@@ -121,6 +138,36 @@ export function registerCartTools(server: McpServer, ctx: ToolContext): void {
       if (!order || order.items.length === 0) return text("Your cart is already empty.");
       await setOrderItems(c, order.id, new Map(order.items.map((it) => [it.productId, 0])));
       return text("Shopping cart cleared.");
+    },
+  );
+
+  addAuthedTool(
+    server,
+    ctx,
+    {
+      name: "ah_get_delivery_slots",
+      title: "Albert Heijn: Delivery Slots",
+      kind: "readOnly",
+      description:
+        "List the delivery time windows Albert Heijn offers at the member's address, per day (Dutch time). " +
+        "Booking a slot is only possible in the AH app or on ah.nl; this shows when delivery is possible. " +
+        "Returns date and windows like '15:00-17:00'.",
+      input: {
+        days: z.number().int().optional().describe("Number of days with slots to return (default 7)"),
+      },
+    },
+    async (c, args) => {
+      const { address } = await cachedMember(ctx, c);
+      if (!address) throw new Error("the member profile has no delivery address; add one in the AH app");
+      const days = (await getDeliverySlots(c, address)).filter((d) => d.slots.length > 0);
+      if (days.length === 0) return text(`AH offers no delivery slots for ${address.postalCode} right now.`);
+      return json({
+        postal_code: address.postalCode,
+        days: days.slice(0, orDefault(args.days, 7)).map((d) => ({
+          date: formatDate(d.date, false),
+          windows: d.slots.map((s) => `${formatTime(s.start)}-${formatTime(s.end)}`),
+        })),
+      });
     },
   );
 }

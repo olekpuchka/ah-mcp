@@ -1,12 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
-import { type AhClient, hasStatus } from "../ahapi/index.ts";
+import { type AhClient, getMember, hasStatus } from "../ahapi/index.ts";
 import { NotLoggedInError } from "../auth/session.ts";
 import type { Session } from "../auth/session.ts";
 import { log } from "../log.ts";
 import { TtlCache } from "./cache.ts";
-import type { BonusOffer, BonusPeriod, Nutrient, Product } from "../ahapi/index.ts";
+import type { BonusOffer, BonusPeriod, Member, Nutrient, Product } from "../ahapi/index.ts";
 
 /** State shared by tool handlers. */
 export interface ToolContext {
@@ -18,6 +18,8 @@ export interface ToolContext {
   nutrition: TtlCache<Nutrient[] | undefined>;
   bonuses: TtlCache<BonusOffer[]>;
   bonusPeriods: TtlCache<BonusPeriod[]>;
+  /** Keyed by access token, so another login never sees a cached profile. */
+  members: TtlCache<Member>;
 }
 
 export function newToolContext(session: Session, remote: boolean): ToolContext {
@@ -29,6 +31,7 @@ export function newToolContext(session: Session, remote: boolean): ToolContext {
     nutrition: new TtlCache(60 * 60_000),
     bonuses: new TtlCache(10 * 60_000),
     bonusPeriods: new TtlCache(10 * 60_000),
+    members: new TtlCache(30 * 60_000),
   };
 }
 
@@ -145,6 +148,11 @@ export async function nonFatal<T>(fn: () => Promise<T>, onError: (err: unknown) 
   }
 }
 
+/** The logged-in member's profile, cached. */
+export function cachedMember(ctx: ToolContext, c: AhClient): Promise<Member> {
+  return ctx.members.getOrLoad(c.token ?? "", () => getMember(c));
+}
+
 /** v if positive, else def. */
 export function orDefault(v: number | undefined, def: number): number {
   return v && v > 0 ? v : def;
@@ -175,6 +183,11 @@ export function formatDate(s: string | undefined, withTime: boolean): string {
   if (Number.isNaN(d.getTime())) return s;
   const formatted = amsterdam.format(d); // "YYYY-MM-DD HH:MM"
   return withTime ? formatted : formatted.slice(0, 10);
+}
+
+/** ISO 8601 → "HH:MM" in Dutch time. */
+export function formatTime(s: string): string {
+  return formatDate(s, true).slice(11);
 }
 
 /** Up to 3 attempts on rate limiting (429), waiting 1 s then 2 s. */

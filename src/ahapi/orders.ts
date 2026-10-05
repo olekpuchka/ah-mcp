@@ -1,4 +1,5 @@
 import type { AhClient } from "./client.ts";
+import type { MemberAddress } from "./member.ts";
 
 export interface Order {
   id: number;
@@ -129,4 +130,29 @@ export async function getFulfillments(c: AhClient, past: boolean): Promise<Fulfi
     dateDisplay: f.delivery?.slot?.dateDisplay,
     timeDisplay: f.delivery?.slot?.timeDisplay,
   }));
+}
+
+/** A day's delivery windows; all times are ISO 8601. */
+export interface DeliveryDay {
+  /** Start of the day in Dutch time. */
+  date: string;
+  slots: { start: string; end: string }[];
+}
+
+/** Delivery windows AH offers for address, per day, soonest first. Booking one is only possible in the AH app. */
+export async function getDeliverySlots(c: AhClient, address: MemberAddress): Promise<DeliveryDay[]> {
+  const query = `query DeliverySlots($address: MemberAddressInput!) {
+  orderDeliverySlots(address: $address) { date slots { startTime endTime } }
+}`;
+  const data = await c.graphql<{
+    orderDeliverySlots: { date: string; slots: { startTime: string; endTime: string }[] }[] | null;
+  }>(query, { address: { ...address, houseNumberExtra: address.houseNumberExtra || undefined } });
+  return (data.orderDeliverySlots ?? [])
+    .map((day) => ({
+      date: day.date,
+      slots: day.slots
+        .map((s) => ({ start: s.startTime, end: s.endTime }))
+        .sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end)),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }

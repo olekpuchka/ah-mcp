@@ -1,5 +1,5 @@
 import type { AhClient } from "./client.ts";
-import type { Product } from "./products.ts";
+import { fromGraphqlProduct, GRAPHQL_PRODUCT_FIELDS, type GraphqlProduct, type Product } from "./products.ts";
 
 /** Weekly bonus period. Index 0 is this week; next week appears a few days before it starts. */
 export interface BonusPeriod {
@@ -77,29 +77,14 @@ export function getPreviouslyBoughtBonus(c: AhClient, date: string): Promise<Bon
 export async function getBonusGroupProducts(c: AhClient, groupId: string, period: BonusPeriod): Promise<Product[]> {
   const query = `query BonusGroupProducts($id: String, $start: String, $end: String) {
   bonusPromotions(input: {id: $id, periodStart: $start, periodEnd: $end}) {
-    products { id title brand salesUnitSize priceV2 { now { amount } was { amount } } }
+    products { ${GRAPHQL_PRODUCT_FIELDS} }
   }
 }`;
-  const data = await c.graphql<{
-    bonusPromotions: {
-      products: {
-        id: number;
-        title: string;
-        brand?: string;
-        salesUnitSize?: string;
-        priceV2?: { now?: { amount: number } | null; was?: { amount: number } | null };
-      }[];
-    }[];
-  }>(query, { id: groupId, start: period.start, end: period.end });
-  return data.bonusPromotions.flatMap((promo) =>
-    promo.products.map((p) => ({
-      webshopId: p.id,
-      title: p.title,
-      brand: p.brand,
-      salesUnitSize: p.salesUnitSize,
-      currentPrice: p.priceV2?.now?.amount,
-      priceBeforeBonus: p.priceV2?.was?.amount,
-      isBonus: true,
-    })),
-  );
+  const data = await c.graphql<{ bonusPromotions: { products: GraphqlProduct[] }[] }>(query, {
+    id: groupId,
+    start: period.start,
+    end: period.end,
+  });
+  // Every product in a bonus group is on bonus, even when the price doesn't show it (e.g. "2+1 gratis").
+  return data.bonusPromotions.flatMap((promo) => promo.products.map((p) => ({ ...fromGraphqlProduct(p), isBonus: true })));
 }

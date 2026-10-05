@@ -51,11 +51,17 @@ ah-mcp is a [Model Context Protocol](https://modelcontextprotocol.io) server for
 
 > *"Put the products I've had delivered at least three times back on my list."*
 
+> *"Find organic, gluten-free pasta, cheapest first."*
+
 > *"Compare the protein and sugar in these three yoghurts and add the best one to my list."*
+
+> *"When can AH deliver on Saturday?"*
+
+> *"The courgettes are sold out. What else would work in this recipe?"*
 
 > *"Add two more packs of milk to my upcoming delivery."*
 
-> *"Save the golden kiwis on my list to my favourites."*
+> *"Make a favourites list called Pasta night with everything from this recipe."*
 
 > *"Any vandaag-af bread or vegetables at my local AH worth picking up tonight?"*
 
@@ -213,8 +219,9 @@ Products and recipes in tool results include a `url` to their page on ah.nl, and
 
 | Tool | Description |
 |---|---|
-| `ah_search_products` | Search one or more keywords at once; Dutch terms work best. `bonus=true` returns only products on bonus. |
+| `ah_search_products` | Search one or more keywords at once; Dutch terms work best. Filter by `bonus=true` or by `filters` (organic, vegan, gluten_free and other diets, allergens and labels), and `sort` by price, what you buy most, or Nutri-Score. |
 | `ah_get_products` | Details for one or more products. `include_nutritional_info=true` adds the nutrition table. |
+| `ah_get_product_alternatives` | Similar products and substitutes AH suggests for a product. |
 | `ah_get_bonus_offers` | This week's bonus offers, or next week's with `period=next`. `previously_bought=true` limits them to products you bought before (AH's "Eerder gekocht"). Can filter by keyword. |
 | `ah_get_bonus_group_products` | The individual products behind a group deal such as "2+1 gratis". |
 | `ah_search_stores` | Nearby stores, by postal code or your own address. |
@@ -245,16 +252,19 @@ Products and recipes in tool results include a `url` to their page on ah.nl, and
 | `ah_get_favorite_lists` | Your favourite lists ("Mijn lijstjes"). |
 | `ah_add_to_favorite_list` | Add products to a favourite list. |
 | `ah_remove_from_favorite_list` | Take products off a favourite list. |
+| `ah_create_favorite_list` | Start a new, empty favourite list. |
+| `ah_delete_favorite_list` | Delete a favourite list and its items. Requires `confirm="yes"`. |
 
 </details>
 
 <details open>
 <summary><b>Delivery order</b></summary>
 
-Choosing a delivery or pick-up slot in the AH app moves your shopping list into an order. These tools work on that order.
+Choosing a delivery or pick-up slot in the AH app moves your shopping list into an order. `ah_get_delivery_slots` shows when delivery is possible; the other tools work on that order.
 
 | Tool | Description |
 |---|---|
+| `ah_get_delivery_slots` | Delivery windows at your address for the coming days. |
 | `ah_get_cart` | Products in the active order, with total price and discount. |
 | `ah_update_cart_item` | Change a product's quantity; 0 takes it out. |
 | `ah_remove_from_cart` | Remove a product from the order. |
@@ -277,7 +287,7 @@ Choosing a delivery or pick-up slot in the AH app moves your shopping list into 
 
 ### Limitations
 
-- **Delivery orders can't be started through the API.** Pick a slot in the AH app or on ah.nl first. While the order is active, AH doesn't serve the shopping list; the tools say so and point to the order tools.
+- **Delivery orders can't be started through the API.** `ah_get_delivery_slots` lists the windows, but booking one, which starts the order, happens in the AH app or on ah.nl. While the order is active, AH doesn't serve the shopping list; the tools say so and point to the order tools.
 - **Ticking off shopping-list items isn't supported:** the API returns no usable item IDs.
 - **Bonus Box**, AH's personal weekly deals, is not available: its API is unknown.
 

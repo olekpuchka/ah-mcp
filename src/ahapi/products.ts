@@ -47,11 +47,87 @@ export function productImage(p: Product): string {
   return p.images?.[0]?.url ?? "";
 }
 
-/** Searches by keyword, most relevant first; returns at most size products. */
-export async function searchProducts(c: AhClient, query: string, size: number): Promise<Product[]> {
-  const params = new URLSearchParams({ query, page: "0", size: String(size), sortOn: "RELEVANCE" });
+/** Product fields shared by GraphQL queries; map with fromGraphqlProduct. */
+export const GRAPHQL_PRODUCT_FIELDS =
+  "id title brand salesUnitSize priceV2 { now { amount } was { amount } discount { description } }";
+
+export interface GraphqlProduct {
+  id: number;
+  title: string;
+  brand?: string;
+  salesUnitSize?: string;
+  priceV2?: {
+    now?: { amount: number } | null;
+    was?: { amount: number } | null;
+    /** The bonus deal, e.g. "2 voor 1.19"; null if none. */
+    discount?: { description?: string | null } | null;
+  };
+}
+
+export function fromGraphqlProduct(p: GraphqlProduct): Product {
+  const now = p.priceV2?.now?.amount;
+  const was = p.priceV2?.was?.amount;
+  const deal = p.priceV2?.discount;
+  return {
+    webshopId: p.id,
+    title: p.title,
+    brand: p.brand,
+    salesUnitSize: p.salesUnitSize,
+    currentPrice: now,
+    priceBeforeBonus: was,
+    // Multi-buy deals ("2 voor 1.19") keep the regular price, so the deal itself marks a bonus.
+    isBonus: Boolean(deal) || (now !== undefined && was !== undefined && now < was),
+    bonusMechanism: deal?.description,
+  };
+}
+
+/** Products AH suggests instead of id (similar or substitute products). */
+export async function getProductAlternatives(c: AhClient, id: number, size: number): Promise<Product[]> {
+  const query = `query ProductAlternatives($id: Int!, $size: PageSize!) {
+  productAlternatives(id: $id, size: $size) { products { ${GRAPHQL_PRODUCT_FIELDS} } }
+}`;
+  const data = await c.graphql<{ productAlternatives: { products: GraphqlProduct[] } | null }>(query, { id, size });
+  return (data.productAlternatives?.products ?? []).map(fromGraphqlProduct);
+}
+
+export type SearchSort = "RELEVANCE" | "PRICELOWHIGH" | "PRICEHIGHLOW" | "PURCHASE_FREQUENCY" | "NUTRISCORE";
+
+export interface SearchOptions {
+  /** AH property ids, e.g. np_biologisch; a product must have all of them. */
+  properties?: string[];
+  /** Only products on bonus. */
+  bonus?: boolean;
+  sort?: SearchSort;
+}
+
+/** Largest page AH serves. */
+const MAX_PAGE = 100;
+
+/** Searches by keyword; returns at most size products. */
+export async function searchProducts(c: AhClient, query: string, size: number, opts: SearchOptions = {}): Promise<Product[]> {
+  const properties = opts.properties ?? [];
+  // AH takes one filter per request (repeated ones get mixed up), so bonus plus properties is filtered here.
+  const filterBonus = Boolean(opts.bonus) && properties.length > 0;
+  // Sorting low to high lists unavailable products without a price first (30 of 100 for "kaas"); they are dropped.
+  const byPrice = opts.sort === "PRICELOWHIGH" || opts.sort === "PRICEHIGHLOW";
+  let fetch = size;
+  if (opts.sort === "PRICELOWHIGH") fetch = MAX_PAGE;
+  else if (filterBonus) fetch = Math.min(Math.max(size * 4, 40), MAX_PAGE);
+
+  const params = new URLSearchParams({ query, page: "0", size: String(fetch), sortOn: opts.sort ?? "RELEVANCE" });
+  // Several properties go comma-separated, which AH combines with AND.
+  if (properties.length) params.set("filters", `property=${properties.join(",")}`);
+  else if (opts.bonus) params.set("filters", "bonus=Bonus");
   const res = await c.request<{ products?: Product[] }>(`/mobile-services/product/search/v2?${params}`);
-  return (res.products ?? []).slice(0, size);
+  let products = res.products ?? [];
+  if (opts.bonus) products = products.filter((p) => p.isBonus);
+  if (byPrice) {
+    // AH sorts on the regular price; re-sort on what the customer pays now, bonus included.
+    const price = (p: Product) => p.currentPrice || p.priceBeforeBonus || 0;
+    const dir = opts.sort === "PRICELOWHIGH" ? 1 : -1;
+    products = products.filter(price).sort((a, b) => dir * (price(a) - price(b)));
+  }
+  return products.slice(0, size);
 }
 
 export async function getProduct(c: AhClient, id: number): Promise<Product> {

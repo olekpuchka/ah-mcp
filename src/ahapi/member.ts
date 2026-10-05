@@ -1,5 +1,15 @@
 import type { AhClient } from "./client.ts";
 
+/** Delivery address, in the form orderDeliverySlots takes. */
+export interface MemberAddress {
+  street: string;
+  houseNumber: number;
+  houseNumberExtra?: string | null;
+  postalCode: string;
+  city: string;
+  countryCode: string;
+}
+
 /** Customer profile. */
 export interface Member {
   firstName: string;
@@ -8,6 +18,7 @@ export interface Member {
   dateOfBirth: string;
   postalCode: string;
   bonusCardNumber: string;
+  address?: MemberAddress;
 }
 
 export async function getMember(c: AhClient): Promise<Member> {
@@ -16,7 +27,7 @@ export async function getMember(c: AhClient): Promise<Member> {
     name { first last }
     emailAddress
     dateOfBirth
-    address { postalCode }
+    address { street houseNumber houseNumberExtra postalCode city countryCode }
     cards { bonus }
   }
 }`;
@@ -25,7 +36,7 @@ export async function getMember(c: AhClient): Promise<Member> {
       name?: { first?: string; last?: string };
       emailAddress?: string;
       dateOfBirth?: string;
-      address?: { postalCode?: string };
+      address?: Partial<MemberAddress> | null;
       cards?: { bonus?: string };
     };
   }>(query);
@@ -36,5 +47,10 @@ export async function getMember(c: AhClient): Promise<Member> {
     dateOfBirth: m.dateOfBirth ?? "",
     postalCode: m.address?.postalCode ?? "",
     bonusCardNumber: m.cards?.bonus ?? "",
+    address: isComplete(m.address) ? m.address : undefined,
   };
+}
+
+function isComplete(a: Partial<MemberAddress> | null | undefined): a is MemberAddress {
+  return Boolean(a?.street && a.houseNumber && a.postalCode && a.city && a.countryCode);
 }

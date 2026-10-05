@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { type AhClient, getBargains, getMember, productUrl, searchStores } from "../ahapi/index.ts";
-import { addAuthedTool, formatDate, json, orDefault, text, type ToolContext, wrapError } from "./common.ts";
+import { type AhClient, getBargains, productUrl, searchStores } from "../ahapi/index.ts";
+import { addAuthedTool, cachedMember, formatDate, json, orDefault, text, type ToolContext, wrapError } from "./common.ts";
 
 export function registerStoreTools(server: McpServer, ctx: ToolContext): void {
   addAuthedTool(
@@ -23,7 +23,7 @@ export function registerStoreTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     async (c, { postal_code }) => {
-      const postalCode = postal_code || (await memberPostalCode(c));
+      const postalCode = postal_code || (await memberPostalCode(ctx, c));
       if (!postalCode) throw new Error("no postal_code provided and member profile has no address on file");
       const stores = await searchStores(c, postalCode);
       if (stores.length === 0) return text(`No AH stores found near ${postalCode}.`);
@@ -61,7 +61,7 @@ export function registerStoreTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     async (c, args) => {
-      const storeId = args.store_id || (await nearestStoreId(c, args.postal_code));
+      const storeId = args.store_id || (await nearestStoreId(ctx, c, args.postal_code));
       if (!storeId) {
         throw new Error(
           "cannot retrieve last-chance items without a store. Please provide store_id or postal_code. " +
@@ -89,17 +89,17 @@ export function registerStoreTools(server: McpServer, ctx: ToolContext): void {
 }
 
 /** The member's postal code, or "" if none is on file. */
-async function memberPostalCode(c: AhClient): Promise<string> {
+async function memberPostalCode(ctx: ToolContext, c: AhClient): Promise<string> {
   try {
-    return (await getMember(c)).postalCode;
+    return (await cachedMember(ctx, c)).postalCode;
   } catch (err) {
     throw wrapError("no postal_code provided and could not fetch member address", err);
   }
 }
 
 /** Nearest store to postalCode (default: member address), or 0 if there is no address or store. */
-async function nearestStoreId(c: AhClient, postalCode: string | undefined): Promise<number> {
-  const code = postalCode || (await memberPostalCode(c));
+async function nearestStoreId(ctx: ToolContext, c: AhClient, postalCode: string | undefined): Promise<number> {
+  const code = postalCode || (await memberPostalCode(ctx, c));
   if (!code) return 0;
   return (await searchStores(c, code))[0]?.id ?? 0;
 }

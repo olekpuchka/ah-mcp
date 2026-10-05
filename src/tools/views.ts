@@ -1,4 +1,4 @@
-import { type Nutrient, type Order, type Product, productImage, productPrices, productUrl } from "../ahapi/index.ts";
+import { type FavoriteList, type Nutrient, type Order, type Product, productImage, productPrices, productUrl } from "../ahapi/index.ts";
 
 /** Product in search and list results. */
 interface ProductSummary {
@@ -66,4 +66,8 @@ export function viewOrder(o: Order) {
     total_price: o.totalPrice || undefined,
     total_discount: o.totalDiscount || undefined,
   };
+}
+
+export function viewFavoriteList(l: FavoriteList) {
+  return { id: l.id, name: l.name, item_count: l.itemCount, updated_at: l.updatedAt };
 }

@@ -1,15 +1,15 @@
 <p align="center"><img src="assets/logo.png" alt="" width="128" height="128"></p>
 
-# ah-mcp
+# albert-heijn-mcp
 
-[![npm](https://img.shields.io/npm/v/ah-mcp?color=cb3837&logo=npm)](https://www.npmjs.com/package/ah-mcp)
+[![npm](https://img.shields.io/npm/v/albert-heijn-mcp?color=cb3837&logo=npm)](https://www.npmjs.com/package/albert-heijn-mcp)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node.js 24](https://img.shields.io/badge/node-24%20LTS-339933?logo=node.js&logoColor=white)](.nvmrc)
 [![MCP](https://img.shields.io/badge/MCP-server-6E56CF)](https://modelcontextprotocol.io)
 
 **Your Albert Heijn account, in your AI assistant.**
 
-ah-mcp is a [Model Context Protocol](https://modelcontextprotocol.io) server for Albert Heijn 🇳🇱. Connect it to any MCP client and just ask: find products and bonus deals, plan meals from Allerhande recipes, keep your shopping list and delivery order up to date, and look back at what you've bought.
+albert-heijn-mcp is a [Model Context Protocol](https://modelcontextprotocol.io) server for Albert Heijn 🇳🇱. Connect it to any MCP client and just ask: find products and bonus deals, plan meals from Allerhande recipes, keep your shopping list and delivery order up to date, and look back at what you've bought.
 
 > [!NOTE]
 > An unofficial project, not affiliated with or endorsed by Albert Heijn. It uses the same API as the AH mobile app, which may change without notice.
@@ -80,9 +80,9 @@ Ask in Dutch, English or any language your assistant speaks:
 
 **Requirements:** Node.js 24 (LTS) and an Albert Heijn account.
 
-There's nothing to install: [connect a client](#connecting-a-client) with `npx -y ah-mcp`, which downloads and runs the [latest version](https://www.npmjs.com/package/ah-mcp), then ask it to log you in to Albert Heijn.
+There's nothing to install: [connect a client](#connecting-a-client) with `npx -y albert-heijn-mcp`, which downloads and runs the [latest version](https://www.npmjs.com/package/albert-heijn-mcp), then ask it to log you in to Albert Heijn.
 
-To install it permanently instead, run `npm install --global ah-mcp` and use the `ah-mcp` command. To [build from source](#development), clone the repository.
+To install it permanently instead, run `npm install --global albert-heijn-mcp` and use the `albert-heijn-mcp` command. To [build from source](#development), clone the repository.
 
 ## Logging in
 
@@ -101,35 +101,35 @@ You only log in once. Tokens are stored on your machine and refreshed automatica
 
 | OS | Location |
 |---|---|
-| macOS | `~/Library/Application Support/ah-mcp/tokens.json` |
-| Linux | `~/.config/ah-mcp/tokens.json` |
-| Windows | `%AppData%\ah-mcp\tokens.json` |
+| macOS | `~/Library/Application Support/albert-heijn-mcp/tokens.json` |
+| Linux | `~/.config/albert-heijn-mcp/tokens.json` |
+| Windows | `%AppData%\albert-heijn-mcp\tokens.json` |
 
 The file is readable only by your user. Override the location with `AH_TOKENS_PATH`.
 
 ## Connecting a client
 
-ah-mcp works with any MCP client. It runs locally over stdio, or on a server over Streamable HTTP.
+albert-heijn-mcp works with any MCP client. It runs locally over stdio, or on a server over Streamable HTTP.
 
 ### Local clients (stdio)
 
-Clients that start MCP servers as a local command run `npx -y ah-mcp`. Most of them take this JSON in their MCP settings:
+Clients that start MCP servers as a local command run `npx -y albert-heijn-mcp`. Most of them take this JSON in their MCP settings:
 
 ```json
 {
   "mcpServers": {
     "ah": {
       "command": "npx",
-      "args": ["-y", "ah-mcp"]
+      "args": ["-y", "albert-heijn-mcp"]
     }
   }
 }
 ```
 
-Where the settings live differs per client; see its documentation. Clients with a CLI usually have an add command instead, e.g. `<client> mcp add ah -- npx -y ah-mcp`. ah-mcp is also listed in the [MCP Registry](https://registry.modelcontextprotocol.io), which some clients install from.
+Where the settings live differs per client; see its documentation. Clients with a CLI usually have an add command instead, e.g. `<client> mcp add ah -- npx -y albert-heijn-mcp`. It is also listed in the [MCP Registry](https://registry.modelcontextprotocol.io), which some clients install from.
 
 > [!TIP]
-> Desktop apps don't load your shell profile, so they may not find `npx` (common with nvm). Then set `command` to the output of `which npx`. For a source checkout, use `node` with the argument `/path/to/ah-mcp/dist/index.js`.
+> Desktop apps don't load your shell profile, so they may not find `npx` (common with nvm). Then set `command` to the output of `which npx`. For a source checkout, use `node` with the argument `/path/to/albert-heijn-mcp/dist/index.js`.
 
 ### Remote clients (Streamable HTTP)
 
@@ -166,41 +166,41 @@ node dist/index.js [--transport stdio|streamable-http] [--remote] [--version] [-
 
 ## Deploying to a server
 
-ah-mcp runs as a hardened systemd service behind a reverse proxy, installed from the latest release.
+albert-heijn-mcp runs as a hardened systemd service behind a reverse proxy, installed from the latest release.
 
 1. **Prepare the server.** Install Node.js 24 and create a service user:
 
    ```bash
-   sudo useradd -r -m -d /home/ah-mcp -s /sbin/nologin ah-mcp
+   sudo useradd -r -m -d /home/albert-heijn-mcp -s /sbin/nologin albert-heijn-mcp
    ```
 
-2. **Configure it** in `/home/ah-mcp/.env`:
+2. **Configure it** in `/home/albert-heijn-mcp/.env`:
 
    ```env
-   AH_MCP_BASE_URL=https://ah-mcp.example.com
+   AH_MCP_BASE_URL=https://albert-heijn-mcp.example.com
    AH_MCP_TOKEN=<output of: openssl rand -hex 32>
    ```
 
-3. **Install it** with the [service unit](deploy/ah-mcp.service) that comes with the package (it runs in `--remote` mode):
+3. **Install it** with the [service unit](deploy/albert-heijn-mcp.service) that comes with the package (it runs in `--remote` mode):
 
    ```bash
-   sudo npm install --global --prefix /usr/local ah-mcp
-   sudo install -m 644 /usr/local/lib/node_modules/ah-mcp/deploy/ah-mcp.service /etc/systemd/system/
+   sudo npm install --global --prefix /usr/local albert-heijn-mcp
+   sudo install -m 644 /usr/local/lib/node_modules/albert-heijn-mcp/deploy/albert-heijn-mcp.service /etc/systemd/system/
    sudo systemctl daemon-reload
-   sudo systemctl enable --now ah-mcp
+   sudo systemctl enable --now albert-heijn-mcp
    ```
 
-   To update, run the same commands, then `sudo systemctl restart ah-mcp`.
+   To update, run the same commands, then `sudo systemctl restart albert-heijn-mcp`.
 
 4. **Add TLS** with a reverse proxy that forwards to `127.0.0.1:3000`. With Caddy:
 
    ```
-   ah-mcp.example.com {
+   albert-heijn-mcp.example.com {
        reverse_proxy 127.0.0.1:3000
    }
    ```
 
-The service can write only to `/home/ah-mcp`, where it keeps its tokens. If you point `AH_LOG_FILE` elsewhere, add that path to `ReadWritePaths` in the unit file.
+The service can write only to `/home/albert-heijn-mcp`, where it keeps its tokens. If you point `AH_LOG_FILE` elsewhere, add that path to `ReadWritePaths` in the unit file.
 
 ## Tools
 
@@ -300,14 +300,14 @@ Choosing a delivery or pick-up slot in the AH app moves your shopping list into 
 ## Development
 
 ```bash
-git clone https://github.com/olekpuchka/ah-mcp
-cd ah-mcp
+git clone https://github.com/olekpuchka/albert-heijn-mcp
+cd albert-heijn-mcp
 npm ci
 npm run build    # compile to dist/
 npm run lint     # type-check
 ```
 
-Run it from the checkout with `node dist/index.js`, or use `/path/to/ah-mcp/dist/index.js` as the argument in your client's config with `node` as the command.
+Run it from the checkout with `node dist/index.js`, or use `/path/to/albert-heijn-mcp/dist/index.js` as the argument in your client's config with `node` as the command.
 
 | Path | Contents |
 |---|---|
@@ -331,7 +331,7 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 Before deploying a change, run a quick check against a real account: log in, search for `melk`, add a product to your shopping list and remove it again, then view your cart and orders.
 
-To release, set the new version in `package.json` and in both places in [`server.json`](server.json), merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. The [release workflow](.github/workflows/release.yml) checks that the versions match, builds the package, attaches it to the GitHub release as `ah-mcp.tgz`, publishes it to npm, and updates the [MCP Registry](https://registry.modelcontextprotocol.io) entry. npm accepts the workflow through [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token is stored.
+To release, set the new version in `package.json` and in both places in [`server.json`](server.json), merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. The [release workflow](.github/workflows/release.yml) checks that the versions match, builds the package, attaches it to the GitHub release as `albert-heijn-mcp.tgz`, publishes it to npm, and updates the [MCP Registry](https://registry.modelcontextprotocol.io) entry. npm accepts the workflow through [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token is stored.
 
 ## Troubleshooting
 

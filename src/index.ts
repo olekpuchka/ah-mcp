@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ah-mcp: a Model Context Protocol server for the Albert Heijn supermarket API.
+// albert-heijn-mcp: a Model Context Protocol server for the Albert Heijn supermarket API.
 
 import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -34,11 +34,11 @@ async function main(): Promise<void> {
     return;
   }
   if (cfg.showVersion) {
-    console.log(`ah-mcp ${version}`);
+    console.log(`albert-heijn-mcp ${version}`);
     return;
   }
   if (cfg.logFile) await logToFile(cfg.logFile);
-  log.info("ah-mcp", { version });
+  log.info("albert-heijn-mcp", { version });
 
   const ctx = newToolContext(new Session(cfg.tokensPath), cfg.remote);
   const newServer = () => {

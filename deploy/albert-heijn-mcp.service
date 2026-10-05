@@ -4,21 +4,21 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=ah-mcp
-EnvironmentFile=/home/ah-mcp/.env
-ExecStart=/usr/local/bin/ah-mcp --transport streamable-http --remote
-WorkingDirectory=/home/ah-mcp
+User=albert-heijn-mcp
+EnvironmentFile=/home/albert-heijn-mcp/.env
+ExecStart=/usr/local/bin/albert-heijn-mcp --transport streamable-http --remote
+WorkingDirectory=/home/albert-heijn-mcp
 Restart=on-failure
 RestartSec=5
 
 # Hardening: the server needs only the network and write access to its home
-# directory (tokens live in /home/ah-mcp/.config). If AH_LOG_FILE points
+# directory (tokens live in /home/albert-heijn-mcp/.config). If AH_LOG_FILE points
 # elsewhere, add it to ReadWritePaths. MemoryDenyWriteExecute is left out:
 # Node's JIT compiler needs it off.
 NoNewPrivileges=yes
 UMask=0077
 ProtectSystem=strict
-ReadWritePaths=/home/ah-mcp
+ReadWritePaths=/home/albert-heijn-mcp
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes

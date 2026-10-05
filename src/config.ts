@@ -26,7 +26,7 @@ export interface Config {
   http: HttpOptions;
 }
 
-export const USAGE = `Usage: ah-mcp [--transport stdio|streamable-http] [--remote] [--version] [--help]
+export const USAGE = `Usage: albert-heijn-mcp [--transport stdio|streamable-http] [--remote] [--version] [--help]
 
   --transport  stdio (default) or streamable-http
   --remote     don't open a browser on login (also AH_REMOTE=true)
@@ -52,7 +52,7 @@ export function loadConfig(argv: string[], env: NodeJS.ProcessEnv = process.env)
   }
   const port = envInt(env, "AH_MCP_PORT", 3000);
   const baseUrl = env.AH_MCP_BASE_URL || `http://localhost:${port}`;
-  if (!URL.canParse(baseUrl)) throw new Error(`AH_MCP_BASE_URL: "${baseUrl}" is not a URL (e.g. https://ah-mcp.example.com)`);
+  if (!URL.canParse(baseUrl)) throw new Error(`AH_MCP_BASE_URL: "${baseUrl}" is not a URL (e.g. https://albert-heijn-mcp.example.com)`);
   return {
     transport,
     remote: values.remote || env.AH_REMOTE === "true",

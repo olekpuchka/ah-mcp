@@ -1,5 +1,5 @@
 {
-  "name": "ah-mcp",
+  "name": "albert-heijn-mcp",
   "version": "1.3.0",
   "description": "Unofficial MCP server for Albert Heijn: products, bonus deals, Allerhande recipes, your shopping list and orders in any AI assistant",
   "keywords": [
@@ -14,25 +14,25 @@
     "allerhande",
     "netherlands"
   ],
-  "homepage": "https://github.com/olekpuchka/ah-mcp#readme",
+  "homepage": "https://github.com/olekpuchka/albert-heijn-mcp#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/olekpuchka/ah-mcp.git"
+    "url": "git+https://github.com/olekpuchka/albert-heijn-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/olekpuchka/ah-mcp/issues"
+    "url": "https://github.com/olekpuchka/albert-heijn-mcp/issues"
   },
   "author": "Olek Puchka",
-  "mcpName": "io.github.olekpuchka/ah-mcp",
+  "mcpName": "io.github.olekpuchka/albert-heijn-mcp",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "ah-mcp": "dist/index.js"
+    "albert-heijn-mcp": "dist/index.js"
   },
   "files": [
     "dist",
     "assets/icon.png",
-    "deploy/ah-mcp.service"
+    "deploy/albert-heijn-mcp.service"
   ],
   "engines": {
     "node": ">=24"

@@ -11,7 +11,7 @@ export interface TokenFile {
   expires_at?: string;
 }
 
-/** <user config dir>/ah-mcp/tokens.json, per OS convention. */
+/** <user config dir>/albert-heijn-mcp/tokens.json, per OS convention. */
 export function defaultTokensPath(): string {
   let configDir: string;
   if (process.platform === "darwin") {
@@ -21,7 +21,7 @@ export function defaultTokensPath(): string {
   } else {
     configDir = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
   }
-  return join(configDir, "ah-mcp", "tokens.json");
+  return join(configDir, "albert-heijn-mcp", "tokens.json");
 }
 
 /** Token response → file format. */
@@ -61,7 +61,7 @@ const LOCK_STALE_MS = 60_000;
 const LOCK_WAIT_MS = 70_000;
 
 /**
- * Runs fn holding an exclusive lock on the tokens file, shared by all ah-mcp
+ * Runs fn holding an exclusive lock on the tokens file, shared by all albert-heijn-mcp
  * processes using it. Refresh tokens rotate, so two processes must not refresh at once.
  * The lock file holds a random ID that identifies its owner (inode numbers get reused).
  */

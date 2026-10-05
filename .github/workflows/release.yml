@@ -31,25 +31,25 @@ jobs:
           echo "VERSION=$version" >> "$GITHUB_ENV"
       - run: npm run lint
       - run: npm run build
-      # One fixed name, so releases/latest/download/ah-mcp.tgz always works; the tag in the URL picks a version.
+      # One fixed name, so releases/latest/download/albert-heijn-mcp.tgz always works; the tag in the URL picks a version.
       - name: Pack
-        run: mv "$(npm pack --silent)" ah-mcp.tgz
+        run: mv "$(npm pack --silent)" albert-heijn-mcp.tgz
       # Creates the release with generated notes unless it already exists (e.g. drafted by hand).
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
-            gh release create "$GITHUB_REF_NAME" --title "ah-mcp $VERSION" --generate-notes --verify-tag
-          gh release upload "$GITHUB_REF_NAME" ah-mcp.tgz --clobber
+            gh release create "$GITHUB_REF_NAME" --title "albert-heijn-mcp $VERSION" --generate-notes --verify-tag
+          gh release upload "$GITHUB_REF_NAME" albert-heijn-mcp.tgz --clobber
       # Trusted publishing: npm accepts this workflow's OIDC identity, so no token is stored. Provenance is
       # added automatically. A version already on npm (e.g. the first one, published by hand) is skipped.
       - name: Publish to npm
         run: |
-          if [ "$(npm view "ah-mcp@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
-            echo "ah-mcp $VERSION is already on npm"
+          if [ "$(npm view "albert-heijn-mcp@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
+            echo "albert-heijn-mcp $VERSION is already on npm"
           else
-            npm publish ah-mcp.tgz --access public
+            npm publish albert-heijn-mcp.tgz --access public
           fi
       # The registry checks that the npm package's mcpName matches server.json.
       - name: Publish to the MCP Registry

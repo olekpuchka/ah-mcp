@@ -42,18 +42,28 @@ jobs:
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
             gh release create "$GITHUB_REF_NAME" --title "albert-heijn-mcp $VERSION" --generate-notes --verify-tag
           gh release upload "$GITHUB_REF_NAME" albert-heijn-mcp.tgz --clobber
-      # Trusted publishing: npm accepts this workflow's OIDC identity, so no token is stored. Provenance is
-      # added automatically. A version already on npm (e.g. the first one, published by hand) is skipped.
-      - name: Publish to npm
+      # Trusted publishing: npm accepts this workflow's OIDC identity, so no token is stored, and adds
+      # provenance. The version is only staged: it goes live once the maintainer approves it on npmjs.com
+      # (or with `npm stage approve`). A version already on npm is skipped.
+      - name: Stage on npm
         run: |
           if [ "$(npm view "albert-heijn-mcp@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
             echo "albert-heijn-mcp $VERSION is already on npm"
           else
-            npm publish albert-heijn-mcp.tgz --access public
+            npm stage publish albert-heijn-mcp.tgz --access public
           fi
-      # The registry checks that the npm package's mcpName matches server.json.
+      # The registry checks that the version is on npm and its mcpName matches server.json, so this waits
+      # for the approval; if it takes longer, re-run this job from the Actions tab.
       - name: Publish to the MCP Registry
+        timeout-minutes: 35
         run: |
+          for _ in $(seq 60); do
+            [ "$(npm view "albert-heijn-mcp@$VERSION" version 2>/dev/null)" = "$VERSION" ] && break
+            echo "waiting for albert-heijn-mcp $VERSION to be approved on npm..."
+            sleep 30
+          done
+          [ "$(npm view "albert-heijn-mcp@$VERSION" version 2>/dev/null)" = "$VERSION" ] ||
+            { echo "albert-heijn-mcp $VERSION is not on npm yet; approve it, then re-run this job"; exit 1; }
           curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
           ./mcp-publisher login github-oidc
           ./mcp-publisher publish

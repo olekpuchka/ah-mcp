@@ -331,7 +331,7 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 Before deploying a change, run a quick check against a real account: log in, search for `melk`, add a product to your shopping list and remove it again, then view your cart and orders.
 
-To release, set the new version in `package.json` and in both places in [`server.json`](server.json), merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. The [release workflow](.github/workflows/release.yml) checks that the versions match, builds the package, attaches it to the GitHub release as `albert-heijn-mcp.tgz`, publishes it to npm, and updates the [MCP Registry](https://registry.modelcontextprotocol.io) entry. npm accepts the workflow through [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token is stored.
+To release, set the new version in `package.json` and in both places in [`server.json`](server.json), merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. The [release workflow](.github/workflows/release.yml) checks that the versions match, builds the package, attaches it to the GitHub release as `albert-heijn-mcp.tgz`, and stages it on npm through [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token is stored. Approve the staged version on npmjs.com (or with `npm stage approve`) to make it live; the workflow then updates the [MCP Registry](https://registry.modelcontextprotocol.io) entry.
 
 ## Troubleshooting
 

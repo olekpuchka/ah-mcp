@@ -332,7 +332,7 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 Before deploying a change, run a quick check against a real account: log in, search for `melk`, add a product to your shopping list and remove it again, then view your cart and orders.
 
-To release, set the new version in `package.json`, merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. The [release workflow](.github/workflows/release.yml) checks that the tag matches the version, builds the package, and attaches it to the GitHub release as `ah-mcp-1.2.3.tgz` and `ah-mcp.tgz` (the latter is what the install command downloads).
+To release, set the new version in `package.json`, merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. The [release workflow](.github/workflows/release.yml) checks that the tag matches the version, builds the package, and attaches it to the GitHub release as `ah-mcp.tgz`. The install command downloads the latest; for a specific version, use `releases/download/v1.2.3/ah-mcp.tgz`.
 
 ## Troubleshooting
 

@@ -24,10 +24,9 @@ jobs:
           echo "VERSION=$version" >> "$GITHUB_ENV"
       - run: npm run lint
       - run: npm run build
+      # One fixed name, so releases/latest/download/ah-mcp.tgz always works; the tag in the URL picks a version.
       - name: Pack
-        run: |
-          npm pack
-          cp "ah-mcp-$VERSION.tgz" ah-mcp.tgz
+        run: mv "$(npm pack --silent)" ah-mcp.tgz
       # Creates the release with generated notes unless it already exists (e.g. drafted by hand).
       - name: Publish
         env:
@@ -35,4 +34,4 @@ jobs:
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
             gh release create "$GITHUB_REF_NAME" --title "ah-mcp $VERSION" --generate-notes --verify-tag
-          gh release upload "$GITHUB_REF_NAME" "ah-mcp-$VERSION.tgz" ah-mcp.tgz --clobber
+          gh release upload "$GITHUB_REF_NAME" ah-mcp.tgz --clobber

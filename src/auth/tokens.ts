@@ -40,14 +40,24 @@ export async function loadTokens(path: string): Promise<TokenFile | undefined> {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw err;
   }
-  return JSON.parse(data) as TokenFile;
+  let tf: Partial<TokenFile> | undefined;
+  try {
+    tf = JSON.parse(data) as Partial<TokenFile>;
+  } catch {
+    // Not reported as is: the parse error would quote the file, i.e. the tokens.
+  }
+  if (typeof tf?.access_token !== "string" || typeof tf.refresh_token !== "string") {
+    throw new Error(`the tokens file ${path} is damaged; log out and log in again`);
+  }
+  return tf as TokenFile;
 }
 
 /** Writes atomically with mode 0600. */
 export async function saveTokens(path: string, tf: TokenFile): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-  const tmp = `${path}.${process.pid}.tmp`;
-  await writeFile(tmp, JSON.stringify(tf, null, 2), { mode: 0o600 });
+  // A new, random name: "wx" refuses an existing file or symlink, which someone else could have placed there.
+  const tmp = `${path}.${randomUUID()}.tmp`;
+  await writeFile(tmp, JSON.stringify(tf, null, 2), { flag: "wx", mode: 0o600 });
   try {
     await rename(tmp, path);
   } catch (err) {

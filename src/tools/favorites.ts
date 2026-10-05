@@ -8,8 +8,17 @@ import {
   GraphQLError,
   removeFromFavoriteList,
 } from "../ahapi/index.ts";
-import { addAuthedTool, orDefault, structured, text, type ToolContext, withRetry } from "./common.ts";
-import { confirmInput } from "./shoppingList.ts";
+import {
+  addAuthedTool,
+  confirmInput,
+  itemText,
+  orDefault,
+  productItems,
+  structured,
+  text,
+  type ToolContext,
+  withRetry,
+} from "./common.ts";
 import { favoriteListView, viewFavoriteList } from "./views.ts";
 
 const listId = z.string().describe("Favorite list ID from ah_get_favorite_lists");
@@ -43,9 +52,7 @@ export function registerFavoriteListTools(server: McpServer, ctx: ToolContext): 
       description: "Add products to a named Albert Heijn favorite list. Get list_id from ah_get_favorite_lists.",
       input: {
         list_id: listId,
-        items: z
-          .array(z.object({ product_id: z.number().int(), quantity: z.number().int() }))
-          .describe('Items to add, e.g. [{"product_id": 123456, "quantity": 1}]. Quantity 0 is treated as 1.'),
+        items: productItems.describe('Items to add, e.g. [{"product_id": 123456, "quantity": 1}]. Quantity 0 is treated as 1.'),
       },
     },
     async (c, args) => {
@@ -91,7 +98,7 @@ export function registerFavoriteListTools(server: McpServer, ctx: ToolContext): 
       description:
         "Create a new, empty Albert Heijn favorite list with the given name; AH drops some punctuation, such as '-'. " +
         "Returns its id; add products with ah_add_to_favorite_list.",
-      input: { name: z.string().describe("Name of the list, e.g. 'Weekend' or 'Pasta night'") },
+      input: { name: itemText.describe("Name of the list, e.g. 'Weekend' or 'Pasta night'") },
     },
     async (c, args) => {
       const name = args.name.trim();

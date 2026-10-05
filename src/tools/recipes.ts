@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { addProductsToShoppingList, getRecipe, type Product, recipeUrl, searchRecipes } from "../ahapi/index.ts";
+import { addProductsToShoppingList, ahPageUrl, getRecipe, type Product, recipeUrl, searchRecipes } from "../ahapi/index.ts";
 import { addAuthedTool, nonFatal, orDefault, parallel, structured, type ToolContext, wrapError } from "./common.ts";
 import { search } from "./products.ts";
 import { listCall } from "./shoppingList.ts";
@@ -197,7 +197,7 @@ export function registerRecipeTools(server: McpServer, ctx: ToolContext): void {
       return structured({
         id: r.id,
         title: r.title,
-        url: `https://www.ah.nl${r.href}`,
+        url: ahPageUrl(r.href, recipeUrl(r.id, "")),
         description: r.description || undefined,
         cook_minutes: r.cookTime || undefined,
         servings: `${servings ?? r.servings.number} ${r.servings.type}`,

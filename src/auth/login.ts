@@ -1,5 +1,5 @@
-/** code=... in a pasted URL or console line. */
-const CODE_PARAM = /[?&]code=([A-Za-z0-9._~-]+)/;
+/** code=... in the pasted appie://login-exit link or the console line quoting it; links elsewhere don't count. */
+const CODE_PARAM = /appie:\/\/login-exit\?(?:[^\s'"]*&)?code=([A-Za-z0-9._~-]+)/;
 /** A bare code. */
 const BARE_CODE = /^[A-Za-z0-9._~-]{8,}$/;
 

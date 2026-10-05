@@ -4,6 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Fresh releases are where hijacked packages show up; wait until they've been around a while.
+    cooldown:
+      default-days: 7
     groups:
       npm:
         patterns: ["*"]
@@ -15,6 +18,8 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]

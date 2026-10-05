@@ -9,12 +9,16 @@ import { isLoopbackHost, readBody, sameSecret, sha256 } from "./request.ts";
 //
 // Nothing is stored. Client IDs, login codes and tokens are signed with a key
 // derived from AH_MCP_TOKEN, so they survive restarts and changing the token
-// revokes them all. Login codes are single-use within this process. Clients
-// without OAuth send AH_MCP_TOKEN itself.
+// revokes them all. Login codes are single-use within this process.
+//
+// MCP requests need an access token: AH_MCP_TOKEN itself is only for logging in,
+// so it never travels with every request or in a URL.
 
 const CODE_TTL = 60;
 const ACCESS_TTL = 60 * 60;
 const REFRESH_TTL = 30 * 24 * 60 * 60;
+/** Refreshing renews tokens until this long after the login; then the client logs in again. */
+const MAX_LOGIN_AGE = 90 * 24 * 60 * 60;
 const MAX_FORM_BYTES = 64 * 1024;
 /**
  * Delay before answering a wrong token. It slows guessing without locking anyone
@@ -42,6 +46,11 @@ interface TokenClaims {
   exp: number;
 }
 
+interface RefreshClaims extends TokenClaims {
+  /** When the owner logged in; absent in refresh tokens from before 1.5.0. */
+  auth?: number;
+}
+
 class OAuthError extends Error {
   readonly code: string;
   readonly description: string;
@@ -62,8 +71,9 @@ const clientHash = (clientId: string) => b64url(sha256(clientId)).slice(0, 22);
 /** The OAuth routes (handle) and the check for MCP requests (authenticate). */
 export class OAuth {
   readonly #key: Buffer;
-  readonly #tokenHash: Buffer;
+  readonly #secretHash: Buffer;
   readonly #issuer: string;
+  readonly #issuerOrigin: string;
   readonly #resource: string;
   readonly #resourceMetadataPath: string;
   readonly #challenge: string;
@@ -72,12 +82,13 @@ export class OAuth {
   readonly #serverMetadata: string;
   readonly #usedCodes = new Map<string, number>();
 
-  /** baseUrl is the public URL of the server; MCP is served at mcpPath under it. */
-  constructor(baseUrl: string, mcpPath: string, token: string) {
+  /** baseUrl is the public URL of the server; MCP is served at mcpPath under it. secret is AH_MCP_TOKEN. */
+  constructor(baseUrl: string, mcpPath: string, secret: string) {
     this.#issuer = baseUrl.replace(/\/+$/, "");
+    this.#issuerOrigin = new URL(this.#issuer).origin;
     this.#resource = this.#issuer + mcpPath;
-    this.#tokenHash = sha256(token);
-    this.#key = createHmac("sha256", token).update("albert-heijn-mcp oauth v1").digest();
+    this.#secretHash = sha256(secret);
+    this.#key = createHmac("sha256", secret).update("albert-heijn-mcp oauth v1").digest();
     this.#resourceMetadataPath = `/.well-known/oauth-protected-resource${new URL(this.#resource).pathname}`;
     this.#challenge = `Bearer resource_metadata="${this.#issuer}${this.#resourceMetadataPath}"`;
     this.#resourceMetadata = JSON.stringify({
@@ -99,16 +110,15 @@ export class OAuth {
   }
 
   /**
-   * Checks an MCP request: AH_MCP_TOKEN or an access token as "Authorization: Bearer …",
-   * or AH_MCP_TOKEN as "?token=…". Returns the WWW-Authenticate header for a 401, or undefined if allowed.
+   * Checks an MCP request for an unexpired access token as "Authorization: Bearer …".
+   * Returns the WWW-Authenticate header for a 401, or undefined if allowed.
    */
-  authenticate(req: IncomingMessage, url: URL): string | undefined {
+  authenticate(req: IncomingMessage): string | undefined {
     const auth = req.headers.authorization;
     const bearer = auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length) : undefined;
-    if (bearer && (sameSecret(bearer, this.#tokenHash) || this.#verify<TokenClaims>("access", bearer))) return undefined;
-    const query = url.searchParams.get("token");
-    if (query && sameSecret(query, this.#tokenHash)) return undefined;
-    return bearer === undefined ? this.#challenge : `${this.#challenge}, error="invalid_token"`;
+    if (bearer === undefined) return this.#challenge;
+    if (this.#verify<TokenClaims>("access", bearer)) return undefined;
+    return `${this.#challenge}, error="invalid_token"`;
   }
 
   /** Serves the OAuth routes; returns false for other paths. */
@@ -192,8 +202,19 @@ export class OAuth {
     const clientId = params.get("client_id") ?? "";
     const redirectUri = params.get("redirect_uri") ?? "";
     const client = this.#verify<ClientClaims>("client", clientId);
-    // Without a known client and redirect URI, errors can't go back to the client.
-    if (!client || !client.redirectUris.includes(redirectUri)) {
+    // Bad requests get an error page rather than a redirect: anyone can register a client, so
+    // redirecting before the owner has acted would make this server an open redirector.
+    const challenge = params.get("code_challenge") ?? "";
+    if (
+      !client ||
+      !client.redirectUris.includes(redirectUri) ||
+      // The form posts from this server's own page; a post from another site must not lead to a redirect either.
+      (req.method === "POST" && !this.#isOwnOrigin(req.headers.origin)) ||
+      params.get("response_type") !== "code" ||
+      params.get("code_challenge_method") !== "S256" ||
+      !/^[A-Za-z0-9_-]{43}$/.test(challenge) ||
+      !this.#isOurResource(params.get("resource"))
+    ) {
       sendPage(res, 400, errorPage("This login link is not valid. Start connecting again from your app."));
       return;
     }
@@ -204,18 +225,12 @@ export class OAuth {
       if (state) url.searchParams.set("state", state);
       res.writeHead(302, { Location: url.href, "Cache-Control": "no-store" }).end();
     };
-    const challenge = params.get("code_challenge") ?? "";
-    if (params.get("response_type") !== "code") return back({ error: "unsupported_response_type" });
-    if (params.get("code_challenge_method") !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(challenge)) {
-      return back({ error: "invalid_request", error_description: "PKCE with S256 is required" });
-    }
-    if (!this.#isOurResource(params.get("resource"))) return back({ error: "invalid_target" });
 
     const showLogin = (status: number, error?: string) =>
       sendPage(res, status, loginPage(this.#issuer, params, client, redirectUri, error));
     if (req.method !== "POST") return showLogin(200);
     if (params.get("action") === "deny") return back({ error: "access_denied" });
-    if (!sameSecret(params.get("password") ?? "", this.#tokenHash)) {
+    if (!sameSecret(params.get("password") ?? "", this.#secretHash)) {
       await setTimeout(FAILED_LOGIN_DELAY_MS);
       log.warn("OAuth login failed", { client: client.name ?? "unnamed" });
       return showLogin(401, "That's not the right token.");
@@ -237,6 +252,8 @@ export class OAuth {
     if (!this.#verify<ClientClaims>("client", clientId)) throw new OAuthError("invalid_client", "unknown client", 401);
     if (!this.#isOurResource(params.get("resource"))) throw new OAuthError("invalid_target", "unknown resource");
     const client = clientHash(clientId);
+    const t = now();
+    let auth = t;
 
     switch (params.get("grant_type")) {
       case "authorization_code": {
@@ -252,20 +269,30 @@ export class OAuth {
         break;
       }
       case "refresh_token": {
-        const refresh = this.#verify<TokenClaims>("refresh", params.get("refresh_token") ?? "");
+        const refresh = this.#verify<RefreshClaims>("refresh", params.get("refresh_token") ?? "");
         if (!refresh || refresh.client !== client) throw new OAuthError("invalid_grant", "the refresh token is invalid or expired");
+        auth = refresh.auth ?? t;
+        if (t - auth >= MAX_LOGIN_AGE) throw new OAuthError("invalid_grant", "the login is too old; log in again");
         break;
       }
       default:
         throw new OAuthError("unsupported_grant_type", "use authorization_code or refresh_token");
     }
-    const t = now();
     sendJson(res, 200, {
       access_token: this.#sign("access", { client, exp: t + ACCESS_TTL } satisfies TokenClaims),
       token_type: "Bearer",
       expires_in: ACCESS_TTL,
-      refresh_token: this.#sign("refresh", { client, exp: t + REFRESH_TTL } satisfies TokenClaims),
+      refresh_token: this.#sign("refresh", {
+        client,
+        exp: Math.min(t + REFRESH_TTL, auth + MAX_LOGIN_AGE),
+        auth,
+      } satisfies RefreshClaims),
     });
+  }
+
+  /** Browsers send Origin with form posts; it is absent only from non-browser clients, which can't be tricked. */
+  #isOwnOrigin(origin: string | undefined): boolean {
+    return origin === undefined || origin === this.#issuerOrigin;
   }
 
   /** Clients may name the MCP endpoint or the server as the resource (RFC 8707), or omit it. */
@@ -339,10 +366,11 @@ function sendPage(res: ServerResponse, status: number, html: string): void {
     .writeHead(status, {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
-      // No scripts, no framing (clickjacking), and the login link stays out of Referer headers.
+      // No scripts, no framing (clickjacking), and the login link stays out of Referer headers sent
+      // to other sites. Not "no-referrer": it would make the form's own posts send Origin: null.
       "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'none'",
       "X-Frame-Options": "DENY",
-      "Referrer-Policy": "no-referrer",
+      "Referrer-Policy": "same-origin",
     })
     .end(html);
 }
@@ -358,12 +386,15 @@ function loginPage(issuer: string, params: URLSearchParams, client: ClientClaims
     const v = params.get(k);
     return v === null ? [] : [`<input type="hidden" name="${k}" value="${escapeHtml(v)}">`];
   }).join("");
-  const app = escapeHtml(client.name ?? "An app");
-  const target = escapeHtml(new URL(redirectUri).host || new URL(redirectUri).protocol);
+  // The name is whatever the app registered with, so it's labelled as such; the destination
+  // shows the scheme too, since x-app://claude.ai is not claude.ai.
+  const app = client.name ? `An app calling itself <strong>${escapeHtml(client.name)}</strong>` : "An app";
+  const { protocol, host } = new URL(redirectUri);
+  const target = escapeHtml(host ? `${protocol}//${host}` : protocol);
   return page(
     "Connect to Albert Heijn",
     `<h1>Connect to Albert Heijn</h1>
-<p><strong>${app}</strong> wants to use this albert-heijn-mcp server, with access to your Albert Heijn account. You'll be sent back to <strong>${target}</strong>.</p>
+<p>${app} wants to use this albert-heijn-mcp server, with access to your Albert Heijn account. You'll be sent back to <strong>${target}</strong>.</p>
 ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ""}
 <form method="post" action="${escapeHtml(issuer)}/authorize">${hidden}
 <label for="password">Server token (AH_MCP_TOKEN)</label>

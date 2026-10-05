@@ -11,8 +11,8 @@ export interface HttpOptions {
   port: number;
   /** Public URL of the server. */
   baseUrl: string;
-  /** Required on every request; serveHttp refuses to start without it. */
-  token?: string;
+  /** AH_MCP_TOKEN: the owner's OAuth login secret and signing key; serveHttp refuses to start without it. */
+  secret?: string;
 }
 
 export interface Config {
@@ -29,7 +29,8 @@ export interface Config {
 export const USAGE = `Usage: albert-heijn-mcp [--transport stdio|streamable-http] [--remote] [--version] [--help]
 
   --transport  stdio (default) or streamable-http
-  --remote     don't open a browser on login (also AH_REMOTE=true)
+  --remote     don't open a browser on login (also AH_REMOTE=true; always so
+               with streamable-http)
 
 Settings come from environment variables, also read from a .env file in the
 working directory. See README.md.`;
@@ -55,7 +56,8 @@ export function loadConfig(argv: string[], env: NodeJS.ProcessEnv = process.env)
   if (!URL.canParse(baseUrl)) throw new Error(`AH_MCP_BASE_URL: "${baseUrl}" is not a URL (e.g. https://albert-heijn-mcp.example.com)`);
   return {
     transport,
-    remote: values.remote || env.AH_REMOTE === "true",
+    // Over HTTP the user is elsewhere, so a browser opened on this machine wouldn't reach them.
+    remote: values.remote || env.AH_REMOTE === "true" || transport === "streamable-http",
     showVersion: values.version,
     showHelp: values.help,
     tokensPath: env.AH_TOKENS_PATH || defaultTokensPath(),
@@ -64,7 +66,7 @@ export function loadConfig(argv: string[], env: NodeJS.ProcessEnv = process.env)
       host: env.AH_MCP_HOST || "127.0.0.1",
       port,
       baseUrl,
-      token: env.AH_MCP_TOKEN || undefined,
+      secret: env.AH_MCP_TOKEN || undefined,
     },
   };
 }

@@ -19,7 +19,7 @@ export function registerAccountTools(server: McpServer, ctx: ToolContext): void 
         "2) After the user logs in, the browser shows a link like appie://login-exit?code=...; " +
         "call ah_login again with code set to that link (or just the code) to finish. " +
         "Codes are single-use and expire quickly. " +
-        "If already logged in, returns the account name.",
+        "If already logged in, returns the account name; to switch accounts, call ah_logout first.",
       input: {
         code: z
           .string()
@@ -30,22 +30,25 @@ export function registerAccountTools(server: McpServer, ctx: ToolContext): void 
       },
     },
     async ({ code }) => {
+      // A working session is never replaced, not even with a code: one planted in a web page or
+      // document would otherwise switch the user to someone else's account without them noticing.
+      // A stored session that AH no longer accepts (e.g. a revoked refresh token) gets a new login.
+      const switchHint = code ? " To switch accounts, call ah_logout first, then ah_login." : "";
+      let stale = false;
+      if (await ctx.session.isAuthenticated()) {
+        try {
+          return text(`Already connected as ${fullName(await currentMember(ctx))}.${switchHint}`);
+        } catch (err) {
+          if (!(err instanceof SessionExpiredError)) {
+            return text(`Already logged in (could not fetch member name: ${(err as Error).message}).${switchHint}`);
+          }
+          stale = true;
+        }
+      }
       if (code) {
         await ctx.session.completeLogin(extractCode(code));
         const name = await memberName(ctx);
         return text(name ? `Login successful! Connected as ${name}.` : "Login successful!");
-      }
-      // A stored session that AH no longer accepts (e.g. a revoked refresh token) gets a new login.
-      let stale = false;
-      if (await ctx.session.isAuthenticated()) {
-        try {
-          return text(`Already connected as ${fullName(await currentMember(ctx))}.`);
-        } catch (err) {
-          if (!(err instanceof SessionExpiredError)) {
-            return text(`Already logged in (could not fetch member name: ${(err as Error).message}).`);
-          }
-          stale = true;
-        }
       }
       if (!ctx.remote) openBrowser(LOGIN_URL);
       return text(`${stale ? "The stored login no longer works, so log in again.\n\n" : ""}To log in to Albert Heijn:

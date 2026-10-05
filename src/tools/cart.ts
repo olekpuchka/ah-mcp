@@ -1,0 +1,126 @@
+// "Cart" tools act on the active delivery order. Before a delivery slot is
+// chosen, the AH app's basket is the shopping list.
+
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import { type AhClient, getActiveOrder, isNoActiveOrder, type Order, setOrderItems } from "../ahapi/index.ts";
+import { addAuthedTool, json, text, type ToolContext, wrapError } from "./common.ts";
+import { confirmInput } from "./shoppingList.ts";
+import { viewOrder } from "./views.ts";
+
+/** AH accepts changes only to an active order, which its API can't create. */
+const NO_ACTIVE_ORDER =
+  "there is no active delivery order to change: " +
+  "to collect products, use the shopping list (ah_add_to_shopping_list); " +
+  "choosing a delivery slot in the AH app or on ah.nl turns the list into an order";
+
+/** undefined if there is no active order. */
+async function activeOrder(c: AhClient): Promise<Order | undefined> {
+  try {
+    return await getActiveOrder(c);
+  } catch (err) {
+    if (isNoActiveOrder(err)) return undefined;
+    throw wrapError("failed to get active order", err);
+  }
+}
+
+export function registerCartTools(server: McpServer, ctx: ToolContext): void {
+  addAuthedTool(
+    server,
+    ctx,
+    {
+      name: "ah_get_cart",
+      title: "Albert Heijn: View Order Cart",
+      kind: "readOnly",
+      description:
+        "View the items in the active Albert Heijn delivery order (the order cart). " +
+        "An order only exists after the user has chosen a delivery or pick-up slot; " +
+        "the products the user is collecting before that are on the shopping list (use ah_get_shopping_list). " +
+        "Returns the order state, items with names and quantities, total price, and total discount.",
+    },
+    async (c) => {
+      const order = await activeOrder(c);
+      if (!order) {
+        return text(
+          "There is no active delivery order, so the order cart is empty. " +
+            "Products the user is collecting are on the shopping list (ah_get_shopping_list).",
+        );
+      }
+      return json(viewOrder(order));
+    },
+  );
+
+  addAuthedTool(
+    server,
+    ctx,
+    {
+      name: "ah_update_cart_item",
+      title: "Albert Heijn: Update Order Item",
+      kind: "destructive",
+      description:
+        "Set the quantity of a product in the active Albert Heijn delivery order. " +
+        "Requires an order (started by choosing a delivery slot in the AH app or on ah.nl, which moves the " +
+        "shopping list into it); to collect products before that, use ah_add_to_shopping_list. " +
+        "Use product_id from ah_search_products or ah_get_cart. " +
+        "Set quantity=0 to remove the item (or use ah_remove_from_cart).",
+      input: {
+        product_id: z.number().int().describe("Numeric product ID"),
+        quantity: z.number().int().describe("New quantity (0 removes the item)"),
+      },
+    },
+    async (c, { product_id, quantity }) => {
+      if (product_id <= 0) throw new Error("product_id is required");
+      if (quantity < 0) throw new Error("quantity must be >= 0");
+      const order = await activeOrder(c);
+      if (!order) throw new Error(NO_ACTIVE_ORDER);
+      await setOrderItems(c, order.id, new Map([[product_id, quantity]]));
+      return text(
+        quantity === 0
+          ? `Product ${product_id} removed from cart.`
+          : `Product ${product_id} quantity set to ${quantity}.`,
+      );
+    },
+  );
+
+  addAuthedTool(
+    server,
+    ctx,
+    {
+      name: "ah_remove_from_cart",
+      title: "Albert Heijn: Remove from Order",
+      kind: "destructive",
+      description:
+        "Remove a single product from the active Albert Heijn delivery order. " +
+        "Use product_id from ah_get_cart. To remove products from the shopping list, use ah_remove_from_shopping_list.",
+      input: { product_id: z.number().int().describe("Numeric product ID to remove") },
+    },
+    async (c, { product_id }) => {
+      if (product_id <= 0) throw new Error("product_id is required");
+      const order = await activeOrder(c);
+      if (!order) return text("Your cart is empty: there is no active order.");
+      await setOrderItems(c, order.id, new Map([[product_id, 0]]));
+      return text(`Product ${product_id} removed from cart.`);
+    },
+  );
+
+  addAuthedTool(
+    server,
+    ctx,
+    {
+      name: "ah_clear_cart",
+      title: "Albert Heijn: Clear Order",
+      kind: "destructive",
+      description:
+        "Remove ALL items from the active Albert Heijn delivery order (not the shopping list). " +
+        'Irreversible — requires confirm="yes" to prevent accidental use.',
+      input: confirmInput,
+    },
+    async (c, { confirm }) => {
+      if (confirm !== "yes") throw new Error('confirm must be "yes" to clear the cart');
+      const order = await activeOrder(c);
+      if (!order || order.items.length === 0) return text("Your cart is already empty.");
+      await setOrderItems(c, order.id, new Map(order.items.map((it) => [it.productId, 0])));
+      return text("Shopping cart cleared.");
+    },
+  );
+}

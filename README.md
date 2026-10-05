@@ -1,0 +1,359 @@
+<p align="center"><img src="assets/logo.png" alt="" width="128" height="128"></p>
+
+# ah-mcp
+
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Node.js 24](https://img.shields.io/badge/node-24%20LTS-339933?logo=node.js&logoColor=white)](.nvmrc)
+[![MCP](https://img.shields.io/badge/MCP-server-6E56CF)](https://modelcontextprotocol.io)
+
+**Do your Albert Heijn shopping through your AI assistant.**
+
+ah-mcp is a [Model Context Protocol](https://modelcontextprotocol.io) server for Albert Heijn 🇳🇱. It lets Claude, ChatGPT, Cursor and other MCP clients search products, find bonus deals, manage your shopping list and delivery order, and read your order history and receipts.
+
+> [!NOTE]
+> An unofficial project, not affiliated with or endorsed by Albert Heijn. It uses the same API as the AH mobile app, which may change without notice.
+
+---
+
+## Contents
+
+- [What you can ask](#what-you-can-ask)
+- [Quick start](#quick-start)
+- [Logging in](#logging-in)
+- [Connecting a client](#connecting-a-client)
+- [Configuration](#configuration)
+- [Deploying to a server](#deploying-to-a-server)
+- [Tools](#tools) and [limitations](#limitations)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+
+## What you can ask
+
+**Plan meals**
+
+> *"Find a vegetarian Allerhande recipe under 30 minutes for two, and put the ingredients on my shopping list."*
+
+> *"Scale the panlasagne recipe to six people and tell me how much salmon I need."*
+
+> *"Plan three weeknight dinners around what's on bonus this week."*
+
+**Save money**
+
+> *"Which products I usually buy are on bonus this week?"*
+
+> *"Rebuild tonight's stir-fry with ingredients that are on bonus, without changing the recipe too much."*
+
+> *"Is next week's bonus out yet? If not, when does it appear?"*
+
+> *"What's in the 2+1 gratis kaas deal?"*
+
+**Shop**
+
+> *"Put the products I've had delivered at least three times back on my list."*
+
+> *"Compare the protein and sugar in these three yoghurts and add the best one to my list."*
+
+> *"Add two more packs of milk to my upcoming delivery."*
+
+> *"Save the golden kiwis on my list to my favourites."*
+
+> *"Any vandaag-af bread or vegetables at my local AH worth picking up tonight?"*
+
+**Look back**
+
+> *"How much did my in-store receipts add up to in September, and what were the five priciest items?"*
+
+> *"Show the receipt from my last shop and list anything I bought more than once."*
+
+## Quick start
+
+**Requirements:** Node.js 24 (LTS) and an Albert Heijn account.
+
+Install the latest release:
+
+```bash
+npm install --global https://github.com/olekpuchka/ah-mcp/releases/latest/download/ah-mcp.tgz
+```
+
+This adds the `ah-mcp` command. Then [connect a client](#connecting-a-client) and ask it to log you in to Albert Heijn. To update, run the same command again; to [build from source](#development), clone the repository instead.
+
+## Logging in
+
+AH's login page has a captcha that only works on AH's own site, so logging in takes two steps:
+
+1. **Ask your assistant to log you in.** It calls `ah_login` and gives you a link to AH's login page; locally, it also opens in your browser. Log in as usual.
+2. **Paste the code back.** After you log in, AH redirects to a link meant for its iPhone app, which the browser can't open, so the page stays put. Open the developer console (Chrome: <kbd>⌘</kbd> <kbd>⌥</kbd> <kbd>J</kbd> on Mac, <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>J</kbd> on Windows/Linux) and find this line:
+
+   ```
+   Failed to launch 'appie://login-exit?code=…' because the scheme does not have a registered handler.
+   ```
+
+   Copy the `appie://login-exit?code=…` link into the chat. The code works once and expires quickly, so paste it right away.
+
+You only log in once. Tokens are stored on your machine and refreshed automatically:
+
+| OS | Location |
+|---|---|
+| macOS | `~/Library/Application Support/ah-mcp/tokens.json` |
+| Linux | `~/.config/ah-mcp/tokens.json` |
+| Windows | `%AppData%\ah-mcp\tokens.json` |
+
+The file is readable only by your user. Override the location with `AH_TOKENS_PATH`.
+
+## Connecting a client
+
+ah-mcp works with any MCP client. It runs locally over stdio, or on a server over Streamable HTTP.
+
+### Local clients (stdio)
+
+Clients that start MCP servers as a local command run `ah-mcp`. Most of them take this JSON in their MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "ah": {
+      "command": "ah-mcp"
+    }
+  }
+}
+```
+
+Where the settings live differs per client; see its documentation. Clients with a CLI usually have an add command instead, e.g. `<client> mcp add ah -- ah-mcp`.
+
+> [!TIP]
+> Desktop apps don't load your shell profile, so they may not find `ah-mcp` or Node (common with nvm). Then use full paths: set `command` to the output of `which node` and `args` to `["<output of: which ah-mcp>"]`. For a source checkout, the argument is `/path/to/ah-mcp/dist/index.js`.
+
+### Remote clients (Streamable HTTP)
+
+Web apps such as ChatGPT and Claude.ai only connect to servers on the internet. Set one up first ([Deploying to a server](#deploying-to-a-server)). The endpoint is `https://your-server/mcp`. Send the token as an `Authorization: Bearer YOUR_TOKEN` header if the client lets you set headers; otherwise put it in the URL: `https://your-server/mcp?token=YOUR_TOKEN`.
+
+**ChatGPT**: needs Developer mode (Plus, Pro, Business, Enterprise and Education). Open Settings → advanced settings, turn on Developer mode, and create a connector with the URL. Set authentication to **No authentication**: ChatGPT offers only OAuth or none, so the token goes in the URL.
+
+**Claude.ai**: Settings → Connectors → Add custom connector, then paste the URL with the token.
+
+> [!IMPORTANT]
+> A token in a URL can end up in proxy logs. Use a long random value (`openssl rand -hex 32`) and replace it if it leaks.
+
+## Configuration
+
+Settings are environment variables. They can also go in a `.env` file in the working directory (see [`.env.example`](.env.example)); variables already set in the environment take precedence.
+
+| Variable | Default | Description |
+|---|---|---|
+| `AH_REMOTE` | `false` | Don't open a browser on login. Use on servers (same as `--remote`). |
+| `AH_TOKENS_PATH` | [per OS](#logging-in) | Where to store login tokens. |
+| `AH_MCP_HOST` | `127.0.0.1` | Interface the HTTP server listens on. Keep the default behind a reverse proxy. |
+| `AH_MCP_PORT` | `3000` | HTTP server port. |
+| `AH_MCP_BASE_URL` | `http://localhost:3000` | Public URL of the HTTP server. Set it on a server: for a non-local URL, the localhost-only `Host` check is turned off so a reverse proxy can forward requests. |
+| `AH_MCP_TOKEN` | — | Secret required on every HTTP request, as `Authorization: Bearer …` or `?token=…`. Required for the HTTP transport, which doesn't start without it. |
+| `AH_LOG_FILE` | — | Also append logs to this file. Logs always go to stderr. |
+
+Command-line flags:
+
+```
+node dist/index.js [--transport stdio|streamable-http] [--remote] [--version] [--help]
+```
+
+`stdio` (the default) is for local clients; `streamable-http` serves MCP at `/mcp`.
+
+## Deploying to a server
+
+The included script installs ah-mcp as a hardened systemd service behind a reverse proxy.
+
+1. **Prepare the server.** Install Node.js 24 and create a service user:
+
+   ```bash
+   sudo useradd -r -m -d /home/ah-mcp -s /sbin/nologin ah-mcp
+   ```
+
+2. **Configure it** in `/home/ah-mcp/.env`:
+
+   ```env
+   AH_MCP_BASE_URL=https://ah-mcp.example.com
+   AH_MCP_TOKEN=<output of: openssl rand -hex 32>
+   ```
+
+3. **Install it** from a clone of this repository on your machine. The same command deploys every update:
+
+   ```bash
+   AH_DEPLOY_HOST=user@your-server ./deploy/deploy.sh
+   ```
+
+   It builds an npm package, installs it to `/usr/local/bin/ah-mcp`, installs [`deploy/ah-mcp.service`](deploy/ah-mcp.service) (which runs in `--remote` mode), and restarts the service. It needs SSH access as a user with `sudo`.
+
+4. **Add TLS** with a reverse proxy that forwards to `127.0.0.1:3000`. With Caddy:
+
+   ```
+   ah-mcp.example.com {
+       reverse_proxy 127.0.0.1:3000
+   }
+   ```
+
+The service can write only to `/home/ah-mcp`, where it keeps its tokens. If you point `AH_LOG_FILE` elsewhere, add that path to `ReadWritePaths` in the unit file.
+
+## Tools
+
+Read-only tools are marked as such, so clients can run them without asking. Tools that remove data are marked destructive, so clients ask for confirmation first.
+
+Products and recipes in tool results include a `url` to their page on ah.nl, and the server asks the assistant to link their names to it.
+
+<details open>
+<summary><b>Account</b></summary>
+
+| Tool | Description |
+|---|---|
+| `ah_login` | Log in: returns AH's login link, then completes the login with the code you paste back. |
+| `ah_logout` | Delete the stored tokens, to switch accounts or reset a session. |
+| `ah_get_member_profile` | Name, email, date of birth, and bonus card number (last 4 digits). |
+
+</details>
+
+<details open>
+<summary><b>Products & offers</b></summary>
+
+| Tool | Description |
+|---|---|
+| `ah_search_products` | Search one or more keywords at once; Dutch terms work best. `bonus=true` returns only products on bonus. |
+| `ah_get_products` | Details for one or more products. `include_nutritional_info=true` adds the nutrition table. |
+| `ah_get_bonus_offers` | This week's bonus offers, or next week's with `period=next`. `previously_bought=true` limits them to products you bought before (AH's "Eerder gekocht"). Can filter by keyword. |
+| `ah_get_bonus_group_products` | The individual products behind a group deal such as "2+1 gratis". |
+| `ah_search_stores` | Nearby stores, by postal code or your own address. |
+| `ah_get_last_chance_items` | Vandaag-af markdowns in a store; the one nearest your address by default. |
+
+</details>
+
+<details open>
+<summary><b>Recipes</b></summary>
+
+| Tool | Description |
+|---|---|
+| `ah_search_recipes` | Search Allerhande recipes; Dutch terms work best. |
+| `ah_get_recipe` | Ingredients, steps, and nutrition per serving. `servings` scales the ingredients. |
+
+</details>
+
+<details open>
+<summary><b>Shopping list & favourites</b></summary>
+
+| Tool | Description |
+|---|---|
+| `ah_get_shopping_list` | Your shopping list ("Mijn lijst"), the basket you fill while shopping. |
+| `ah_add_to_shopping_list` | Put products on the list, with a quantity each. |
+| `ah_add_free_text_to_shopping_list` | Add a free-text item, like "verse bloemen". |
+| `ah_remove_from_shopping_list` | Remove products or free-text items. |
+| `ah_clear_shopping_list` | Remove everything. Requires `confirm="yes"`. |
+| `ah_get_favorite_lists` | Your favourite lists ("Mijn lijstjes"). |
+| `ah_add_to_favorite_list` | Add products to a favourite list. |
+| `ah_remove_from_favorite_list` | Take products off a favourite list. |
+
+</details>
+
+<details open>
+<summary><b>Delivery order</b></summary>
+
+Choosing a delivery or pick-up slot in the AH app moves your shopping list into an order. These tools work on that order.
+
+| Tool | Description |
+|---|---|
+| `ah_get_cart` | Products in the active order, with total price and discount. |
+| `ah_update_cart_item` | Change a product's quantity; 0 takes it out. |
+| `ah_remove_from_cart` | Remove a product from the order. |
+| `ah_clear_cart` | Remove everything from the order. Requires `confirm="yes"`. |
+
+</details>
+
+<details open>
+<summary><b>Orders & receipts</b></summary>
+
+| Tool | Description |
+|---|---|
+| `ah_get_orders` | Upcoming delivery orders, or past ones with `past=true`. |
+| `ah_get_order_details` | Products in one order. |
+| `ah_get_frequent_items` | Your most-ordered products, counted over your delivery orders. |
+| `ah_get_receipts` | Recent in-store receipts (kassabonnen). |
+| `ah_get_receipt_details` | Items, discounts and payment for one receipt. |
+
+</details>
+
+### Limitations
+
+- **Delivery orders can't be started through the API.** Pick a slot in the AH app or on ah.nl first. While the order is active, AH doesn't serve the shopping list; the tools say so and point to the order tools.
+- **Ticking off shopping-list items isn't supported:** the API returns no usable item IDs.
+- **Bonus Box**, AH's personal weekly deals, is not available: its API is unknown.
+
+## Development
+
+```bash
+git clone https://github.com/olekpuchka/ah-mcp
+cd ah-mcp
+npm ci
+npm run build    # compile to dist/
+npm run lint     # type-check
+```
+
+Run it from the checkout with `node dist/index.js`, or use `/path/to/ah-mcp/dist/index.js` as the argument in your client's config with `node` as the command.
+
+| Path | Contents |
+|---|---|
+| [`src/index.ts`](src/index.ts), [`src/config.ts`](src/config.ts) | Entry point, flags and settings |
+| [`src/ahapi/`](src/ahapi) | Client for AH's REST and GraphQL API, on Node's built-in `fetch` |
+| [`src/auth/`](src/auth) | Login code exchange, token storage and refresh |
+| [`src/server/`](src/server) | Streamable HTTP transport and token check |
+| [`src/tools/`](src/tools) | The MCP tools, one file per area |
+| [`deploy/`](deploy) | systemd unit and deploy script |
+| [`.github/`](.github) | CI, release workflow and Dependabot |
+| [`assets/`](assets) | Logo for this README and the server icon shown by MCP clients |
+
+The only runtime dependencies are the official [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) and Zod, which the SDK uses for tool schemas.
+
+To call tools by hand, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+
+```bash
+npx @modelcontextprotocol/inspector node dist/index.js
+```
+
+Before deploying a change, run a quick check against a real account: log in, search for `melk`, add a product to your shopping list and remove it again, then view your cart and orders.
+
+To release, set the new version in `package.json`, merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. The [release workflow](.github/workflows/release.yml) checks that the tag matches the version, builds the package, and attaches it to the GitHub release as `ah-mcp-1.2.3.tgz` and `ah-mcp.tgz` (the latter is what the install command downloads).
+
+## Troubleshooting
+
+<details>
+<summary><b>Login fails with "exchange code"</b></summary>
+
+Codes work once and expire quickly. Ask to log in again and paste the new link straight away.
+</details>
+
+<details>
+<summary><b>No "Failed to launch" line after logging in</b></summary>
+
+Open the developer console before you submit the login form, or look for the `appie://login-exit?code=…` request in the Network tab. Browsers other than Chrome may show the link in an error page or dialog instead.
+</details>
+
+<details>
+<summary><b>"Not logged in", or the session seems broken</b></summary>
+
+Log out and back in through the assistant, or delete `tokens.json` from the [token location](#logging-in) and log in again.
+</details>
+
+<details>
+<summary><b>"There is no active delivery order to change"</b></summary>
+
+AH accepts order changes only once an order exists. Choose a delivery slot in the AH app or on ah.nl first.
+</details>
+
+<details>
+<summary><b>"The shopping list is not available while a delivery order is active"</b></summary>
+
+Choosing a slot moved your list into the order. Use `ah_get_cart` and `ah_update_cart_item` until the order is delivered or cancelled.
+</details>
+
+<details>
+<summary><b>Port 3000 is in use</b></summary>
+
+Set `AH_MCP_PORT` to another port, in the environment or `.env`.
+</details>
+
+## License
+
+[Apache 2.0](LICENSE)

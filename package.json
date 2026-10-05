@@ -1,0 +1,30 @@
+{
+  "name": "ah-mcp",
+  "version": "1.0.0",
+  "description": "Model Context Protocol server for the Albert Heijn supermarket API",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "ah-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "assets/icon.png"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "tsc --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.1",
+    "typescript": "^7.0.2"
+  }
+}

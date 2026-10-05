@@ -113,7 +113,11 @@ albert-heijn-mcp works with any MCP client. It runs locally over stdio, or on a 
 
 ### Local clients (stdio)
 
-Clients that start MCP servers as a local command run `npx -y albert-heijn-mcp`. Most of them take this JSON in their MCP settings:
+Install it in one click:
+
+[![Install in Cursor](https://img.shields.io/badge/Cursor-Install_server-000000?logo=cursor&logoColor=white)](https://cursor.com/en/install-mcp?name=ah&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImFsYmVydC1oZWlqbi1tY3AiXX0%3D)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_server-0098FF)](https://insiders.vscode.dev/redirect/mcp/install?name=ah&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22albert-heijn-mcp%22%5D%7D)
+Other clients that start MCP servers as a local command run `npx -y albert-heijn-mcp`. Most of them take this JSON in their MCP settings:
 
 ```json
 {

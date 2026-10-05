@@ -319,6 +319,7 @@ Run it from the checkout with `node dist/index.js`, or use `/path/to/ah-mcp/dist
 | [`src/server/`](src/server) | Streamable HTTP transport and token check |
 | [`src/tools/`](src/tools) | The MCP tools, one file per area |
 | [`deploy/`](deploy) | systemd unit, shipped in the package |
+| [`listing/`](listing) | Name, descriptions and icon to use in connector settings and app directories ([how](listing/README.md)) |
 | [`.github/`](.github) | CI, release workflow and Dependabot |
 | [`assets/`](assets) | Logo for this README and the server icon shown by MCP clients |
 

@@ -1,22 +1,27 @@
 import { rm } from "node:fs/promises";
-import { AhClient, exchangeCode, hasStatus, refreshToken, wrapError } from "../ahapi/index.ts";
+import { AhClient, ContextError, exchangeCode, hasStatus, refreshToken, wrapError } from "../ahapi/index.ts";
+import type { LogSafe } from "../log.ts";
 import { loadTokens, saveTokens, type TokenFile, toTokenFile, withFileLock } from "./tokens.ts";
 
 /** Refresh this long before the access token expires. */
 const REFRESH_MARGIN_MS = 60_000;
 
 /** No tokens are stored. */
-export class NotLoggedInError extends Error {
+export class NotLoggedInError extends Error implements LogSafe {
   constructor() {
     super("not logged in");
     this.name = "NotLoggedInError";
   }
+
+  logText(): string {
+    return this.message;
+  }
 }
 
 /** AH rejected the stored refresh token (expired or revoked): the user must log in again. */
-export class SessionExpiredError extends Error {
+export class SessionExpiredError extends ContextError {
   constructor(cause: unknown) {
-    super(wrapError("token refresh failed; log in again", cause).message, { cause });
+    super("token refresh failed; log in again", cause);
     this.name = "SessionExpiredError";
   }
 }

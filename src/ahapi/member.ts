@@ -15,7 +15,6 @@ export interface Member {
   firstName: string;
   lastName: string;
   email: string;
-  dateOfBirth: string;
   postalCode: string;
   bonusCardNumber: string;
   address?: MemberAddress;
@@ -26,7 +25,6 @@ export async function getMember(c: AhClient): Promise<Member> {
   member {
     name { first last }
     emailAddress
-    dateOfBirth
     address { street houseNumber houseNumberExtra postalCode city countryCode }
     cards { bonus }
   }
@@ -35,7 +33,6 @@ export async function getMember(c: AhClient): Promise<Member> {
     member: {
       name?: { first?: string; last?: string };
       emailAddress?: string;
-      dateOfBirth?: string;
       address?: Partial<MemberAddress> | null;
       cards?: { bonus?: string };
     };
@@ -44,7 +41,6 @@ export async function getMember(c: AhClient): Promise<Member> {
     firstName: m.name?.first ?? "",
     lastName: m.name?.last ?? "",
     email: m.emailAddress ?? "",
-    dateOfBirth: m.dateOfBirth ?? "",
     postalCode: m.address?.postalCode ?? "",
     bonusCardNumber: m.cards?.bonus ?? "",
     address: isComplete(m.address) ? m.address : undefined,

@@ -85,19 +85,25 @@ export function registerAccountTools(server: McpServer, ctx: ToolContext): void 
       kind: "readOnly",
       description:
         "Get your Albert Heijn member profile. " +
-        "Returns name, email, date_of_birth, and bonus_card_number (last 4 digits only).",
+        "Returns name, email (masked), and bonus_card_number (last 4 digits only).",
     },
     async (c) => {
       const m = await getMember(c);
       const card = m.bonusCardNumber;
       return json({
         name: fullName(m),
-        email: m.email,
+        email: maskEmail(m.email) || undefined,
         bonus_card_number: card ? (card.length > 4 ? `****${card.slice(-4)}` : card) : undefined,
-        date_of_birth: m.dateOfBirth || undefined,
       });
     },
   );
+}
+
+/** "jan.jansen@gmail.com" → "jan…@gmail.com": enough to recognise the account. */
+function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at < 1) return email ? "…" : "";
+  return `${email.slice(0, Math.min(3, at - 1))}…${email.slice(at)}`;
 }
 
 function fullName(m: Member): string {

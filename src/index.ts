@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { Session } from "./auth/session.ts";
 import { loadConfig, loadDotEnv, USAGE } from "./config.ts";
-import { log, logToFile } from "./log.ts";
+import { closeLog, log, logToFile } from "./log.ts";
 import { serveHttp } from "./server/http.ts";
 import { newToolContext, registerTools } from "./tools/index.ts";
 
@@ -56,14 +56,27 @@ async function main(): Promise<void> {
   const httpServer = await serveHttp(newServer, cfg.http);
   const shutdown = () => {
     log.info("shutting down");
-    httpServer.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 5000).unref();
+    httpServer.close(() => exit(0));
+    setTimeout(() => exit(0), 5000).unref();
   };
   process.once("SIGTERM", shutdown);
   process.once("SIGINT", shutdown);
 }
 
+/** Exits once the log file has the last lines. */
+function exit(code: number): void {
+  void closeLog().then(() => process.exit(code));
+}
+
+// Node would print these in full, possibly quoting AH's responses; log them safely instead.
+for (const event of ["uncaughtException", "unhandledRejection"] as const) {
+  process.on(event, (err: unknown) => {
+    log.error(event, { err });
+    exit(1);
+  });
+}
+
 main().catch((err) => {
   log.error("fatal", { err });
-  process.exit(1);
+  exit(1);
 });

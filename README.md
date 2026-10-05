@@ -6,9 +6,9 @@
 [![Node.js 24](https://img.shields.io/badge/node-24%20LTS-339933?logo=node.js&logoColor=white)](.nvmrc)
 [![MCP](https://img.shields.io/badge/MCP-server-6E56CF)](https://modelcontextprotocol.io)
 
-**Do your Albert Heijn shopping through your AI assistant.**
+**Your Albert Heijn account, in your AI assistant.**
 
-ah-mcp is a [Model Context Protocol](https://modelcontextprotocol.io) server for Albert Heijn 🇳🇱. It lets Claude, ChatGPT, Cursor and other MCP clients search products, find bonus deals, manage your shopping list and delivery order, and read your order history and receipts.
+ah-mcp is a [Model Context Protocol](https://modelcontextprotocol.io) server for Albert Heijn 🇳🇱. Connect it to any MCP client and just ask: find products and bonus deals, plan meals from Allerhande recipes, keep your shopping list and delivery order up to date, and look back at what you've bought.
 
 > [!NOTE]
 > An unofficial project, not affiliated with or endorsed by Albert Heijn. It uses the same API as the AH mobile app, which may change without notice.
@@ -28,6 +28,10 @@ ah-mcp is a [Model Context Protocol](https://modelcontextprotocol.io) server for
 - [Troubleshooting](#troubleshooting)
 
 ## What you can ask
+
+Ask in Dutch, English or any language your assistant speaks:
+
+> *"Wat is er deze week in de bonus van wat ik meestal koop?"*
 
 **Plan meals**
 
@@ -210,7 +214,7 @@ Products and recipes in tool results include a `url` to their page on ah.nl, and
 |---|---|
 | `ah_login` | Log in: returns AH's login link, then completes the login with the code you paste back. |
 | `ah_logout` | Delete the stored tokens, to switch accounts or reset a session. |
-| `ah_get_member_profile` | Name, email, date of birth, and bonus card number (last 4 digits). |
+| `ah_get_member_profile` | Name, masked email, and bonus card number (last 4 digits). |
 
 </details>
 

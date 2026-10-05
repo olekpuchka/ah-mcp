@@ -1,5 +1,7 @@
 // Client for the AH mobile app API (REST under /mobile-services, plus GraphQL).
 
+import { describeError, type LogSafe } from "../log.ts";
+
 // The API expects the official iOS app. If AH starts rejecting requests,
 // update the version and user agent to the current app release first.
 export const CLIENT_NAME = "appie-ios";
@@ -9,7 +11,7 @@ const BASE_URL = "https://api.ah.nl";
 const TIMEOUT_MS = 30_000;
 
 /** A non-2xx API response. */
-export class AhApiError extends Error {
+export class AhApiError extends Error implements LogSafe {
   readonly status: number;
 
   /** body usually explains the error. */
@@ -18,6 +20,10 @@ export class AhApiError extends Error {
     this.name = "AhApiError";
     this.status = status;
   }
+
+  logText(): string {
+    return `AH API error ${this.status}`;
+  }
 }
 
 /** Reports whether err is an AhApiError with this HTTP status. */
@@ -25,16 +31,36 @@ export function hasStatus(err: unknown, status: number): boolean {
   return err instanceof AhApiError && err.status === status;
 }
 
+/** An error with our own context in front of its cause's message. */
+export class ContextError extends Error implements LogSafe {
+  /** Our text, without the cause's (which may quote AH). */
+  readonly context: string;
+
+  constructor(context: string, cause: unknown) {
+    super(`${context}: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    this.name = "ContextError";
+    this.context = context;
+  }
+
+  logText(): string {
+    return `${this.context}: ${describeError(this.cause)}`;
+  }
+}
+
 /** Wraps err with context, keeping it as the cause so its HTTP status stays visible. */
-export function wrapError(message: string, err: unknown): Error {
-  return new Error(`${message}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+export function wrapError(message: string, err: unknown): ContextError {
+  return new ContextError(message, err);
 }
 
 /** The errors array of a GraphQL response. */
-export class GraphQLError extends Error {
+export class GraphQLError extends Error implements LogSafe {
   constructor(messages: string[]) {
     super(`AH GraphQL error: ${messages.join("; ")}`);
     this.name = "GraphQLError";
+  }
+
+  logText(): string {
+    return "AH GraphQL error";
   }
 }
 
@@ -94,9 +120,23 @@ export interface MutationResult {
   errorMessage?: string | null;
 }
 
+/** A mutation AH answered with a status other than SUCCESS. */
+export class MutationError extends Error implements LogSafe {
+  readonly status: string;
+
+  constructor(result: MutationResult | undefined) {
+    const status = result?.status ?? "no result";
+    super(`mutation failed (${status}): ${result?.errorMessage ?? ""}`);
+    this.name = "MutationError";
+    this.status = status;
+  }
+
+  logText(): string {
+    return `mutation failed (${this.status})`;
+  }
+}
+
 /** Throws unless status is SUCCESS. */
 export function checkMutation(result: MutationResult | undefined): void {
-  if (result?.status !== "SUCCESS") {
-    throw new Error(`mutation failed (${result?.status ?? "no result"}): ${result?.errorMessage ?? ""}`);
-  }
+  if (result?.status !== "SUCCESS") throw new MutationError(result);
 }

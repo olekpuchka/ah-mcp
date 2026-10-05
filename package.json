@@ -1,6 +1,6 @@
 {
   "name": "ah-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Model Context Protocol server for the Albert Heijn supermarket API",
   "license": "Apache-2.0",
   "type": "module",

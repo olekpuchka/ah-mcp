@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   type AhClient,
+  bonusGroupUrl,
   type BonusOffer,
   type BonusPeriod,
   getBonusGroupProducts,
@@ -73,7 +74,7 @@ export function registerBonusTools(server: McpServer, ctx: ToolContext): void {
           id: o.id || undefined,
           bonus_segment_id: o.segment || undefined,
           title: o.title,
-          url: o.id ? productUrl(o.id, o.title) : undefined,
+          url: o.id ? productUrl(o.id, o.title) : o.segment ? bonusGroupUrl(o.segment) : undefined,
           original_price: o.was || undefined,
           // Absent for deals like "2 voor 1.19"; bonus_mechanism describes those.
           bonus_price: o.now || undefined,

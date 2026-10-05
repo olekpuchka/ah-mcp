@@ -37,6 +37,11 @@ export async function getBonusPeriods(c: AhClient): Promise<BonusPeriod[]> {
   });
 }
 
+/** The ah.nl page of a group deal, listing its products. */
+export function bonusGroupUrl(segmentId: string): string {
+  return `https://www.ah.nl/bonus/groep/${segmentId}`;
+}
+
 /** Group deal, e.g. "2+1 gratis". */
 export interface BonusGroup {
   /** For getBonusGroupProducts. */

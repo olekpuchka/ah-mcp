@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
-import type { z } from "zod";
+import { z } from "zod";
 import { type AhClient, getMember, hasStatus } from "../ahapi/index.ts";
 import { NotLoggedInError } from "../auth/session.ts";
 import type { Session } from "../auth/session.ts";
@@ -97,7 +97,7 @@ export function addTool<Shape extends z.ZodRawShape>(
     def.name,
     {
       title: def.title,
-      description: def.description,
+      description: def.description + (hasUrl(def.output) ? LINK_HINT : ""),
       inputSchema: def.input ?? ({} as Shape),
       outputSchema: def.output,
       annotations: annotations(def.title, def.kind),
@@ -105,6 +105,14 @@ export function addTool<Shape extends z.ZodRawShape>(
     // Typed via Args<Shape> above; the SDK's generic callback type doesn't infer here.
     callback as never,
   );
+}
+
+/** Appended to tools whose results have ah.nl links; tool descriptions reach the model in every client. */
+const LINK_HINT = " When you mention a product or recipe from the result, link its name to its url.";
+
+/** Reports whether results of this output shape include a url field anywhere. */
+function hasUrl(output: z.ZodRawShape | undefined): boolean {
+  return output !== undefined && JSON.stringify(z.toJSONSchema(z.object(output))).includes('"url"');
 }
 
 const NOT_AUTHENTICATED = JSON.stringify({

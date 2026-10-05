@@ -168,7 +168,7 @@ node dist/index.js [--transport stdio|streamable-http] [--remote] [--version] [-
 
 ## Deploying to a server
 
-The included script installs ah-mcp as a hardened systemd service behind a reverse proxy.
+ah-mcp runs as a hardened systemd service behind a reverse proxy, installed from the latest release.
 
 1. **Prepare the server.** Install Node.js 24 and create a service user:
 
@@ -183,13 +183,16 @@ The included script installs ah-mcp as a hardened systemd service behind a rever
    AH_MCP_TOKEN=<output of: openssl rand -hex 32>
    ```
 
-3. **Install it** from a clone of this repository on your machine. The same command deploys every update:
+3. **Install it** with the [service unit](deploy/ah-mcp.service) that comes with the package (it runs in `--remote` mode):
 
    ```bash
-   AH_DEPLOY_HOST=user@your-server ./deploy/deploy.sh
+   sudo npm install --global --prefix /usr/local https://github.com/olekpuchka/ah-mcp/releases/latest/download/ah-mcp.tgz
+   sudo install -m 644 /usr/local/lib/node_modules/ah-mcp/deploy/ah-mcp.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now ah-mcp
    ```
 
-   It builds an npm package, installs it to `/usr/local/bin/ah-mcp`, installs [`deploy/ah-mcp.service`](deploy/ah-mcp.service) (which runs in `--remote` mode), and restarts the service. It needs SSH access as a user with `sudo`.
+   To update, run the same commands, then `sudo systemctl restart ah-mcp`.
 
 4. **Add TLS** with a reverse proxy that forwards to `127.0.0.1:3000`. With Caddy:
 
@@ -314,7 +317,7 @@ Run it from the checkout with `node dist/index.js`, or use `/path/to/ah-mcp/dist
 | [`src/auth/`](src/auth) | Login code exchange, token storage and refresh |
 | [`src/server/`](src/server) | Streamable HTTP transport and token check |
 | [`src/tools/`](src/tools) | The MCP tools, one file per area |
-| [`deploy/`](deploy) | systemd unit and deploy script |
+| [`deploy/`](deploy) | systemd unit, shipped in the package |
 | [`.github/`](.github) | CI, release workflow and Dependabot |
 | [`assets/`](assets) | Logo for this README and the server icon shown by MCP clients |
 

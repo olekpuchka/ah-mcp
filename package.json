@@ -9,7 +9,8 @@
   },
   "files": [
     "dist",
-    "assets/icon.png"
+    "assets/icon.png",
+    "deploy/ah-mcp.service"
   ],
   "engines": {
     "node": ">=24"

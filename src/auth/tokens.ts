@@ -31,6 +31,14 @@ export function toTokenFile(t: Token): TokenFile {
   return tf;
 }
 
+/** The tokens file isn't valid JSON with both tokens. */
+export class DamagedTokensError extends Error {
+  constructor(path: string) {
+    super(`the tokens file ${path} is damaged; log in again`);
+    this.name = "DamagedTokensError";
+  }
+}
+
 /** Returns undefined if the file does not exist. */
 export async function loadTokens(path: string): Promise<TokenFile | undefined> {
   let data: string;
@@ -47,7 +55,7 @@ export async function loadTokens(path: string): Promise<TokenFile | undefined> {
     // Not reported as is: the parse error would quote the file, i.e. the tokens.
   }
   if (typeof tf?.access_token !== "string" || typeof tf.refresh_token !== "string") {
-    throw new Error(`the tokens file ${path} is damaged; log out and log in again`);
+    throw new DamagedTokensError(path);
   }
   return tf as TokenFile;
 }

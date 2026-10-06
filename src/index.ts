@@ -7,6 +7,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { Session } from "./auth/session.ts";
 import { loadConfig, loadDotEnv, USAGE } from "./config.ts";
 import { closeLog, log, logToFile } from "./log.ts";
+import { runLogin } from "./loginCommand.ts";
 import { serveHttp } from "./server/http.ts";
 import { newToolContext, registerTools } from "./tools/index.ts";
 
@@ -39,6 +40,15 @@ async function main(): Promise<void> {
     console.log(`albert-heijn-mcp ${version}`);
     return;
   }
+  if (cfg.command === "login") {
+    try {
+      await runLogin(new Session(cfg.tokensPath), cfg.remote);
+    } catch (err) {
+      console.error(`Login failed: ${(err as Error).message}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
   if (cfg.logFile) await logToFile(cfg.logFile);
   log.info("albert-heijn-mcp", { version });
 
@@ -52,6 +62,15 @@ async function main(): Promise<void> {
   if (cfg.transport === "stdio") {
     log.info("starting server", { transport: "stdio" });
     await newServer().connect(new StdioServerTransport());
+    // The client is gone or stops this server: close a login window first, so it and its temporary
+    // profile aren't left behind.
+    process.stdin.once("end", () => void ctx.browserLogin.cancel());
+    for (const [signal, status] of [["SIGTERM", 143], ["SIGINT", 130], ["SIGHUP", 129]] as const) {
+      process.once(signal, () => {
+        setTimeout(() => exit(status), 10_000).unref();
+        void ctx.browserLogin.cancel().then(() => exit(status));
+      });
+    }
     return;
   }
 

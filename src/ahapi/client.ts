@@ -42,6 +42,14 @@ export function hasStatus(err: unknown, status: number): boolean {
   return err instanceof AhApiError && err.status === status;
 }
 
+/** Reports whether err, or any error in its cause chain, is an HTTP 401 from AH. */
+export function isUnauthorized(err: unknown): boolean {
+  for (let e = err; e instanceof Error; e = e.cause) {
+    if (hasStatus(e, 401)) return true;
+  }
+  return false;
+}
+
 /** An error with our own context in front of its cause's message. */
 export class ContextError extends Error implements LogSafe {
   /** Our text, without the cause's (which may quote AH). */

@@ -20,6 +20,11 @@ export interface Member {
   address?: MemberAddress;
 }
 
+/** "First Last", as AH shows it. */
+export function fullName(m: Member): string {
+  return `${m.firstName} ${m.lastName}`.trim();
+}
+
 export async function getMember(c: AhClient): Promise<Member> {
   const query = `query Member {
   member {

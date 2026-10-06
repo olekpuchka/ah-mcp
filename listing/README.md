@@ -20,4 +20,4 @@ For example:
 
 How to add the server to each client is in the main README, under [Connecting a client](../README.md#connecting-a-client).
 
-Keep the texts in line with what the server does when tools change, and keep the "unofficial" note in `longDescription`.
+Keep the texts in line with what the server does when tools change, and keep the "unofficial" note in `longDescription`. [`manifest.json`](../manifest.json), the `.mcpb` bundle's manifest, repeats `displayName`, `shortDescription`, `longDescription` and `keywords` for the install screen; update it along with them.

@@ -47,7 +47,6 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@anthropic-ai/mcpb": "^2.1.2",
     "@types/node": "^24.19.1",
     "typescript": "^7.0.2"
   }

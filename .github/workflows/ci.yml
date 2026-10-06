@@ -27,7 +27,9 @@ jobs:
       - name: Build
         run: npm run build
       - name: Validate manifest.json for the .mcpb bundle
-        run: npx mcpb validate manifest.json
+        env:
+          npm_config_ignore_scripts: "true"
+        run: npx -y @anthropic-ai/mcpb@2.1.2 validate manifest.json
       - uses: ./.github/actions/mcp-publisher
       - name: Validate server.json for the MCP Registry
         run: |

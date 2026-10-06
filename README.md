@@ -311,7 +311,7 @@ The service can write only to `/home/albert-heijn-mcp`, where it keeps its token
 
 ## Configuration
 
-Settings are environment variables. They can also go in a `.env` file in the working directory (see [`.env.example`](.env.example)); variables already set in the environment take precedence.
+Settings are environment variables. They can also go in a `.env` file in the working directory (see [`.env.example`](.env.example)); variables already set in the environment take precedence. On a hosting platform, set them in its environment variable or secret settings instead of a `.env` file, so `AH_MCP_TOKEN` stays out of the app's files.
 
 | Variable | Default | Description |
 |---|---|---|

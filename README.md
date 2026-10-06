@@ -82,7 +82,7 @@ Ask in Dutch, English or any language your assistant speaks:
 
 There's nothing to install: [connect a client](#connecting-a-client) with `npx -y albert-heijn-mcp`, which downloads and runs the [latest version](https://www.npmjs.com/package/albert-heijn-mcp), then ask it to log you in to Albert Heijn.
 
-To install it permanently instead, run `npm install --global albert-heijn-mcp` and use the `albert-heijn-mcp` command. To [build from source](#development), clone the repository.
+To install it permanently instead, run `npm install --global albert-heijn-mcp` and use the `albert-heijn-mcp` command; run the same command again to update. To [build from source](#development), clone the repository.
 
 ## Logging in
 
@@ -102,7 +102,7 @@ You only log in once. Tokens are stored on your machine and refreshed automatica
 | OS | Location |
 |---|---|
 | macOS | `~/Library/Application Support/albert-heijn-mcp/tokens.json` |
-| Linux | `~/.config/albert-heijn-mcp/tokens.json` |
+| Linux | `~/.config/albert-heijn-mcp/tokens.json` (or under `$XDG_CONFIG_HOME`) |
 | Windows | `%AppData%\albert-heijn-mcp\tokens.json` |
 
 The file is readable only by your user. Override the location with `AH_TOKENS_PATH`.
@@ -117,6 +117,7 @@ Install it in one click:
 
 [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_server-000000?logo=cursor&logoColor=white)](https://cursor.com/en/install-mcp?name=ah&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImFsYmVydC1oZWlqbi1tY3AiXX0%3D)
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_server-0098FF)](https://insiders.vscode.dev/redirect/mcp/install?name=ah&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22albert-heijn-mcp%22%5D%7D)
+
 Other clients that start MCP servers as a local command run `npx -y albert-heijn-mcp`. Most of them take this JSON in their MCP settings:
 
 ```json
@@ -249,7 +250,7 @@ Tools that return data also return it as [structured output](https://modelcontex
 |---|---|
 | `ah_search_recipes` | Search Allerhande recipes; Dutch terms work best. |
 | `ah_get_recipe` | Ingredients, steps, and nutrition per serving. `servings` scales the ingredients. |
-| `ah_add_recipe_to_shopping_list` | Match a recipe's ingredients to products and add them to the list in one step. `skip` leaves out what you have; `dry_run=true` previews the matches. |
+| `ah_add_recipe_to_shopping_list` | Match a recipe's ingredients to products and add them to the list in one step. It prefers products on bonus (`prefer_bonus=false` turns that off); `skip` leaves out what you have, and `dry_run=true` previews the matches. |
 
 </details>
 
@@ -304,6 +305,7 @@ Choosing a delivery or pick-up slot in the AH app moves your shopping list into 
 - **Delivery orders can't be started through the API.** `ah_get_delivery_slots` lists the windows, but booking one, which starts the order, happens in the AH app or on ah.nl. While the order is active, AH doesn't serve the shopping list; the tools say so and point to the order tools.
 - **Ticking off shopping-list items isn't supported:** the API returns no usable item IDs.
 - **Bonus Box**, AH's personal weekly deals, is not available: its API is unknown.
+- **Limits per call:** at most 99 of a product, 50 items, and 100 characters for a free-text item or list name.
 
 ## Development
 
@@ -322,11 +324,11 @@ Run it from the checkout with `node dist/index.js`, or use `/path/to/albert-heij
 | [`src/index.ts`](src/index.ts), [`src/config.ts`](src/config.ts) | Entry point, flags and settings |
 | [`src/ahapi/`](src/ahapi) | Client for AH's REST and GraphQL API, on Node's built-in `fetch` |
 | [`src/auth/`](src/auth) | Login code exchange, token storage and refresh |
-| [`src/server/`](src/server) | Streamable HTTP transport and token check |
+| [`src/server/`](src/server) | Streamable HTTP transport and OAuth login |
 | [`src/tools/`](src/tools) | The MCP tools, one file per area |
 | [`deploy/`](deploy) | systemd unit, shipped in the package |
 | [`listing/`](listing) | Name, descriptions and icon to use in connector settings and app directories ([how](listing/README.md)) |
-| [`.github/`](.github) | CI, release workflow and Dependabot |
+| [`.github/`](.github) | CI, release workflow, Dependabot and the pinned `mcp-publisher` install |
 | [`assets/`](assets) | Logo for this README and the server icon shown by MCP clients |
 
 The only runtime dependencies are the official [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) and Zod, which the SDK uses for tool schemas.
@@ -339,7 +341,7 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 Before deploying a change, run a quick check against a real account: log in, search for `melk`, add a product to your shopping list and remove it again, then view your cart and orders.
 
-To release, set the new version in `package.json` and in both places in [`server.json`](server.json), merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. The [release workflow](.github/workflows/release.yml) checks that the versions match, builds the package, attaches it to the GitHub release as `albert-heijn-mcp.tgz`, and stages it on npm through [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token is stored. Approve the staged version on npmjs.com (or with `npm stage approve`) to make it live; the workflow then updates the [MCP Registry](https://registry.modelcontextprotocol.io) entry.
+To release, set the new version with `npm version 1.2.3 --no-git-tag-version` and in both places in [`server.json`](server.json), merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. Only repository admins can create `v*` tags. The [release workflow](.github/workflows/release.yml) checks that the versions match, builds the package, attaches it to the GitHub release as `albert-heijn-mcp.tgz`, and stages it on npm through [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token is stored. Approve the staged version on npmjs.com (or with `npm stage approve`) to make it live; the workflow then updates the [MCP Registry](https://registry.modelcontextprotocol.io) entry. The release starts without notes; write them on GitHub.
 
 ## Troubleshooting
 
@@ -371,6 +373,24 @@ AH accepts order changes only once an order exists. Choose a delivery slot in th
 <summary><b>"The shopping list is not available while a delivery order is active"</b></summary>
 
 Choosing a slot moved your list into the order. Use `ah_get_cart` and `ah_update_cart_item` until the order is delivered or cancelled.
+</details>
+
+<details>
+<summary><b>"Already connected as …" when pasting a login code</b></summary>
+
+A code never replaces a working login, so a code from someone else's account can't switch you over. To switch accounts, ask to log out first, then log in again.
+</details>
+
+<details>
+<summary><b>The HTTP server doesn't start: "needs AH_MCP_TOKEN of at least 32 characters"</b></summary>
+
+Set `AH_MCP_TOKEN` to a long random value, e.g. the output of `openssl rand -hex 32`, and restart. Changing it logs out every client; reconnect them once.
+</details>
+
+<details>
+<summary><b>OAuth login shows "This login link is not valid"</b></summary>
+
+Start connecting again from the client. If it keeps happening right after you enter the token, check that `AH_MCP_BASE_URL` is exactly the address in your browser, including `https://`: the login form is only accepted from that address.
 </details>
 
 <details>

@@ -1,6 +1,6 @@
 {
   "name": "albert-heijn-mcp",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Unofficial MCP server for Albert Heijn: products, bonus deals, Allerhande recipes, your shopping list and orders in any AI assistant",
   "keywords": [
     "mcp",
@@ -47,6 +47,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
     "@types/node": "^24.19.1",
     "typescript": "^7.0.2"
   }

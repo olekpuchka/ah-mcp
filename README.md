@@ -9,7 +9,9 @@
 
 **Your Albert Heijn account, in your AI assistant.**
 
-albert-heijn-mcp is a [Model Context Protocol](https://modelcontextprotocol.io) server for Albert Heijn 🇳🇱. Connect it to any MCP client and just ask: find products and bonus deals, plan meals from Allerhande recipes, keep your shopping list and delivery order up to date, and look back at what you've bought.
+Connect your Albert Heijn account to an AI assistant such as Claude, ChatGPT or Cursor, and do your grocery shopping by just asking. Find products and bonus deals, plan meals from Allerhande recipes, keep your shopping list and delivery order up to date, and look back at what you've bought.
+
+Technically, it's a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for Albert Heijn 🇳🇱. MCP is the standard way AI apps connect to other services, so it works with any app that supports MCP.
 
 > [!NOTE]
 > An unofficial project, not affiliated with or endorsed by Albert Heijn. It uses the same API as the AH mobile app, which may change without notice.
@@ -18,15 +20,18 @@ albert-heijn-mcp is a [Model Context Protocol](https://modelcontextprotocol.io) 
 
 ## Contents
 
+**For everyone**
+
 - [What you can ask](#what-you-can-ask)
-- [Quick start](#quick-start)
-- [Logging in](#logging-in)
-- [Connecting a client](#connecting-a-client)
+- [Getting started](#getting-started): [connect your app](#connecting-a-client), then [log in](#logging-in)
+- [Troubleshooting](#troubleshooting)
+
+**Technical details**
+
+- [Running it on a server](#running-it-on-a-server) for ChatGPT and Claude.ai
 - [Configuration](#configuration)
-- [Deploying to a server](#deploying-to-a-server)
 - [Tools](#tools) and [limitations](#limitations)
 - [Development](#development)
-- [Troubleshooting](#troubleshooting)
 
 ## What you can ask
 
@@ -76,49 +81,51 @@ Ask in Dutch, English or any language your assistant speaks:
 
 > *"Show the receipt from my last shop and list anything I bought more than once."*
 
-## Quick start
+## Getting started
 
-**Requirements:** Node.js 24 (LTS) and an Albert Heijn account.
+You need an Albert Heijn account. Then:
 
-There's nothing to install: [connect a client](#connecting-a-client) with `npx -y albert-heijn-mcp`, which downloads and runs the [latest version](https://www.npmjs.com/package/albert-heijn-mcp), then ask it to log you in to Albert Heijn.
-
-To install it permanently instead, run `npm install --global albert-heijn-mcp` and use the `albert-heijn-mcp` command; run the same command again to update. To [build from source](#development), clone the repository.
-
-## Logging in
-
-AH's login page has a captcha that only works on AH's own site, so logging in takes two steps:
-
-1. **Ask your assistant to log you in.** It calls `ah_login` and gives you a link to AH's login page; locally, it also opens in your browser. Log in as usual.
-2. **Paste the code back.** After you log in, AH redirects to a link meant for its iPhone app, which the browser can't open, so the page stays put. Open the developer console (Chrome: <kbd>⌘</kbd> <kbd>⌥</kbd> <kbd>J</kbd> on Mac, <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>J</kbd> on Windows/Linux) and find this line:
-
-   ```
-   Failed to launch 'appie://login-exit?code=…' because the scheme does not have a registered handler.
-   ```
-
-   Copy the `appie://login-exit?code=…` link into the chat. The code works once and expires quickly, so paste it right away.
-
-You only log in once. Tokens are stored on your machine and refreshed automatically:
-
-| OS | Location |
-|---|---|
-| macOS | `~/Library/Application Support/albert-heijn-mcp/tokens.json` |
-| Linux | `~/.config/albert-heijn-mcp/tokens.json` (or under `$XDG_CONFIG_HOME`) |
-| Windows | `%AppData%\albert-heijn-mcp\tokens.json` |
-
-The file is readable only by your user. Override the location with `AH_TOKENS_PATH`.
+1. **[Connect your app](#connecting-a-client)**: pick yours below.
+2. **[Log in to Albert Heijn](#logging-in)**: ask your assistant to log you in, once.
+3. **Ask away.** See [what you can ask](#what-you-can-ask).
 
 ## Connecting a client
 
-albert-heijn-mcp works with any MCP client. It runs locally over stdio, or on a server over Streamable HTTP.
+| Your app | How |
+|---|---|
+| **Claude Desktop** | [Download and double-click](#claude-desktop). Easiest; nothing else to install. |
+| **Cursor**, **VS Code** | [One-click install button](#cursor-and-vs-code) |
+| **ChatGPT**, **Claude.ai** (web and mobile) | [Needs your own server](#chatgpt-and-claudeai) (technical) |
+| **Other apps** | [Add a command to the app's settings](#other-apps) |
 
-### Local clients (stdio)
+### Claude Desktop
 
-Install it in one click:
+1. Download [`albert-heijn-mcp.mcpb`](https://github.com/olekpuchka/albert-heijn-mcp/releases/latest/download/albert-heijn-mcp.mcpb).
+2. Double-click it and choose **Install**. If it doesn't open in Claude, go to Settings → Extensions → Advanced settings → Install Extension… and pick the file.
+
+That's it: the file contains everything it needs. To update, do the same with the file from the newest release.
+
+Other desktop apps that support [MCP Bundles](https://github.com/modelcontextprotocol/mcpb) (`.mcpb` files) install it the same way.
+
+### Cursor and VS Code
+
+Install [Node.js 24 (LTS)](https://nodejs.org) first, then click:
 
 [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_server-000000?logo=cursor&logoColor=white)](https://cursor.com/en/install-mcp?name=ah&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImFsYmVydC1oZWlqbi1tY3AiXX0%3D)
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_server-0098FF)](https://insiders.vscode.dev/redirect/mcp/install?name=ah&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22albert-heijn-mcp%22%5D%7D)
 
-Other clients that start MCP servers as a local command run `npx -y albert-heijn-mcp`. Most of them take this JSON in their MCP settings:
+### ChatGPT and Claude.ai
+
+Web and mobile apps can't run anything on your computer; they only connect to servers on the internet. So you first need to [run it on a server](#running-it-on-a-server), which takes some technical know-how. Then add it as a connector:
+
+- **ChatGPT** needs Developer mode (Plus, Pro, Business, Enterprise and Education). Open Settings → advanced settings, turn on Developer mode, and create a connector with `https://your-server/mcp`. Set authentication to **OAuth**.
+- **Claude.ai**: Settings → Connectors → Add custom connector, paste `https://your-server/mcp` and choose Connect.
+
+The app then opens a login page on your server: enter your `AH_MCP_TOKEN` there, once.
+
+### Other apps
+
+Apps that start MCP servers as a local command need [Node.js 24 (LTS)](https://nodejs.org) and run `npx -y albert-heijn-mcp`, which downloads and runs the [latest version](https://www.npmjs.com/package/albert-heijn-mcp). Most of them take this JSON in their MCP settings:
 
 ```json
 {
@@ -131,49 +138,118 @@ Other clients that start MCP servers as a local command run `npx -y albert-heijn
 }
 ```
 
-Where the settings live differs per client; see its documentation. Clients with a CLI usually have an add command instead, e.g. `<client> mcp add ah -- npx -y albert-heijn-mcp`. It is also listed in the [MCP Registry](https://registry.modelcontextprotocol.io), which some clients install from.
+Where the settings live differs per app; see its documentation. Apps with a command line usually have an add command instead, e.g. `<client> mcp add ah -- npx -y albert-heijn-mcp`. It is also listed in the [MCP Registry](https://registry.modelcontextprotocol.io), which some apps install from.
+
+To install it permanently instead, run `npm install --global albert-heijn-mcp` and use the `albert-heijn-mcp` command; run the same command again to update.
 
 > [!TIP]
-> Desktop apps don't load your shell profile, so they may not find `npx` (common with nvm). Then set `command` to the output of `which npx`. For a source checkout, use `node` with the argument `/path/to/albert-heijn-mcp/dist/index.js`.
+> Desktop apps don't load your shell profile, so they may not find `npx` (common with nvm). Then set `command` to the output of `which npx`.
 
-### Remote clients (Streamable HTTP)
+## Logging in
 
-Web apps such as ChatGPT and Claude.ai only connect to servers on the internet. Set one up first ([Deploying to a server](#deploying-to-a-server)). The endpoint is `https://your-server/mcp`.
+AH's login page has a captcha that only works on AH's own website, so logging in takes two steps. You only do this once.
 
-Clients log in with OAuth: add the endpoint with OAuth (or automatic) authentication, and the client opens a login page on your server. Enter your `AH_MCP_TOKEN` there once; the client then gets its own tokens and renews them. The server accepts only these OAuth tokens, not `AH_MCP_TOKEN` itself, so clients without OAuth support can't connect over HTTP; run them locally over [stdio](#local-clients-stdio) instead.
+1. **Ask your assistant to log you in.** It gives you a link to AH's login page, and on your own computer it also opens it in your browser. Log in as usual.
+2. **Copy the code back into the chat.** After you log in, AH tries to open its phone app, which your browser can't do, so the page seems stuck. The code you need is in the browser's developer console, a panel for web developers that you can open safely:
+   - Open it in Chrome with <kbd>⌘</kbd> <kbd>⌥</kbd> <kbd>J</kbd> on Mac, or <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>J</kbd> on Windows and Linux.
+   - Find this red line:
 
-**ChatGPT**: needs Developer mode (Plus, Pro, Business, Enterprise and Education). Open Settings → advanced settings, turn on Developer mode, and create a connector with the endpoint. Set authentication to **OAuth**.
+     ```
+     Failed to launch 'appie://login-exit?code=…' because the scheme does not have a registered handler.
+     ```
 
-**Claude.ai**: Settings → Connectors → Add custom connector, then paste the endpoint and choose Connect.
+   - Copy the part from `appie://` up to the closing quote and paste it into the chat. The code works once and expires quickly, so paste it right away.
+
+No line there? See [Troubleshooting](#troubleshooting).
+
+<details>
+<summary><b>Where your login is stored</b></summary>
+
+Your login is saved on your own computer and renewed automatically, in a file only your user can read:
+
+| OS | Location |
+|---|---|
+| macOS | `~/Library/Application Support/albert-heijn-mcp/tokens.json` |
+| Linux | `~/.config/albert-heijn-mcp/tokens.json` (or under `$XDG_CONFIG_HOME`) |
+| Windows | `%AppData%\albert-heijn-mcp\tokens.json` |
+
+Override the location with `AH_TOKENS_PATH`.
+</details>
+
+## Troubleshooting
+
+<details>
+<summary><b>No "Failed to launch" line after logging in</b></summary>
+
+Open the developer console before you submit the login form, or look for the `appie://login-exit?code=…` request in the Network tab. Browsers other than Chrome may show the link in an error page or dialog instead.
+</details>
+
+<details>
+<summary><b>Login fails with "exchange code"</b></summary>
+
+Codes work once and expire quickly. Ask to log in again and paste the new link straight away.
+</details>
+
+<details>
+<summary><b>"Not logged in", or the session seems broken</b></summary>
+
+Ask your assistant to log you out and back in, or delete `tokens.json` from the [login location](#logging-in) and log in again.
+</details>
+
+<details>
+<summary><b>"Already connected as …" when pasting a login code</b></summary>
+
+A code never replaces a working login, so a code from someone else's account can't switch you over. To switch accounts, ask to log out first, then log in again.
+</details>
+
+<details>
+<summary><b>"There is no active delivery order to change"</b></summary>
+
+AH accepts order changes only once an order exists. Choose a delivery slot in the AH app or on ah.nl first.
+</details>
+
+<details>
+<summary><b>"The shopping list is not available while a delivery order is active"</b></summary>
+
+Choosing a slot moved your list into the order. Ask your assistant to change the order instead (`ah_get_cart`, `ah_update_cart_item`) until it is delivered or cancelled.
+</details>
+
+<details>
+<summary><b>The server doesn't start: "needs AH_MCP_TOKEN of at least 32 characters"</b></summary>
+
+Set `AH_MCP_TOKEN` to a long random value, e.g. the output of `openssl rand -hex 32`, and restart. Changing it logs out every client; reconnect them once.
+</details>
+
+<details>
+<summary><b>Server login page shows "This login link is not valid"</b></summary>
+
+Start connecting again from the app. If it keeps happening right after you enter the token, check that `AH_MCP_BASE_URL` is exactly the address in your browser, including `https://`: the login form is only accepted from that address.
+</details>
+
+<details>
+<summary><b>Server login opens at localhost, or the app can't reach it</b></summary>
+
+Set `AH_MCP_BASE_URL` to the server's public `https://` URL and restart it. Apps are sent there to log in.
+</details>
+
+<details>
+<summary><b>Port 3000 is in use</b></summary>
+
+Set `AH_MCP_PORT` to another port, in the environment or `.env`.
+</details>
+
+---
+
+## Running it on a server
+
+Web and mobile apps such as ChatGPT and Claude.ai need the server on the internet, over Streamable HTTP with HTTPS. The endpoint is `https://your-server/mcp`.
+
+Apps log in with OAuth: add the endpoint with OAuth (or automatic) authentication, and the app opens a login page on your server. Enter your `AH_MCP_TOKEN` there once; the app then gets its own tokens and renews them. The server accepts only these OAuth tokens, not `AH_MCP_TOKEN` itself, so apps without OAuth support can't connect over HTTP; run them [locally](#other-apps) instead.
 
 > [!IMPORTANT]
 > Anyone with `AH_MCP_TOKEN` can log in and use your Albert Heijn account. Use a long random value (`openssl rand -hex 32`). Changing it logs out every client.
 
-## Configuration
-
-Settings are environment variables. They can also go in a `.env` file in the working directory (see [`.env.example`](.env.example)); variables already set in the environment take precedence.
-
-| Variable | Default | Description |
-|---|---|---|
-| `AH_REMOTE` | `false` | Don't open a browser on login (same as `--remote`). Always on with `streamable-http`. |
-| `AH_TOKENS_PATH` | [per OS](#logging-in) | Where to store login tokens. |
-| `AH_MCP_HOST` | `127.0.0.1` | Interface the HTTP server listens on. Keep the default behind a reverse proxy. |
-| `AH_MCP_PORT` | `3000` | HTTP server port. |
-| `AH_MCP_BASE_URL` | `http://localhost:3000` | Public URL of the HTTP server. Set it on a server: OAuth clients are sent to this URL to log in, and for a non-local URL the localhost-only `Host` check is turned off so a reverse proxy can forward requests. |
-| `AH_MCP_TOKEN` | — | Secret for the HTTP transport, at least 32 characters; the transport doesn't start without it. You enter it on the OAuth login page; it also signs the OAuth tokens. |
-| `AH_LOG_FILE` | — | Also append logs to this file. Logs always go to stderr. |
-
-Command-line flags:
-
-```
-node dist/index.js [--transport stdio|streamable-http] [--remote] [--version] [--help]
-```
-
-`stdio` (the default) is for local clients; `streamable-http` serves MCP at `/mcp`, with OAuth login at `/authorize`.
-
-## Deploying to a server
-
-albert-heijn-mcp runs as a hardened systemd service behind a reverse proxy, installed from npm.
+It runs as a hardened systemd service behind a reverse proxy, installed from npm:
 
 1. **Prepare the server.** Install Node.js 24 and create a service user:
 
@@ -211,13 +287,35 @@ albert-heijn-mcp runs as a hardened systemd service behind a reverse proxy, inst
 
 The service can write only to `/home/albert-heijn-mcp`, where it keeps its tokens. If you point `AH_LOG_FILE` elsewhere, add that path to `ReadWritePaths` in the unit file.
 
+## Configuration
+
+Settings are environment variables. They can also go in a `.env` file in the working directory (see [`.env.example`](.env.example)); variables already set in the environment take precedence.
+
+| Variable | Default | Description |
+|---|---|---|
+| `AH_REMOTE` | `false` | Don't open a browser on login (same as `--remote`). Always on with `streamable-http`. |
+| `AH_TOKENS_PATH` | [per OS](#logging-in) | Where to store login tokens. |
+| `AH_MCP_HOST` | `127.0.0.1` | Interface the HTTP server listens on. Keep the default behind a reverse proxy. |
+| `AH_MCP_PORT` | `3000` | HTTP server port. |
+| `AH_MCP_BASE_URL` | `http://localhost:3000` | Public URL of the HTTP server. Set it on a server: OAuth clients are sent to this URL to log in, and for a non-local URL the localhost-only `Host` check is turned off so a reverse proxy can forward requests. |
+| `AH_MCP_TOKEN` | — | Secret for the HTTP transport, at least 32 characters; the transport doesn't start without it. You enter it on the OAuth login page; it also signs the OAuth tokens. |
+| `AH_LOG_FILE` | — | Also append logs to this file. Logs always go to stderr. |
+
+Command-line flags:
+
+```
+node dist/index.js [--transport stdio|streamable-http] [--remote] [--version] [--help]
+```
+
+`stdio` (the default) is for local clients; `streamable-http` serves MCP at `/mcp`, with OAuth login at `/authorize`.
+
 ## Tools
 
-Read-only tools are marked as such, so clients can run them without asking. Tools that remove data are marked destructive, so clients ask for confirmation first.
+These are what your assistant uses behind the scenes; you don't call them yourself. Read-only tools are marked as such, so apps can run them without asking. Tools that remove data are marked destructive, so apps ask for confirmation first.
 
 Tools that return data also return it as [structured output](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#structured-content) with a declared schema, for clients that use it. Products and recipes in tool results include a `url` to their page on ah.nl, and the server asks the assistant to link their names to it.
 
-<details open>
+<details>
 <summary><b>Account</b></summary>
 
 | Tool | Description |
@@ -228,7 +326,7 @@ Tools that return data also return it as [structured output](https://modelcontex
 
 </details>
 
-<details open>
+<details>
 <summary><b>Products & offers</b></summary>
 
 | Tool | Description |
@@ -243,7 +341,7 @@ Tools that return data also return it as [structured output](https://modelcontex
 
 </details>
 
-<details open>
+<details>
 <summary><b>Recipes</b></summary>
 
 | Tool | Description |
@@ -254,7 +352,7 @@ Tools that return data also return it as [structured output](https://modelcontex
 
 </details>
 
-<details open>
+<details>
 <summary><b>Shopping list & favourites</b></summary>
 
 | Tool | Description |
@@ -272,7 +370,7 @@ Tools that return data also return it as [structured output](https://modelcontex
 
 </details>
 
-<details open>
+<details>
 <summary><b>Delivery order</b></summary>
 
 Choosing a delivery or pick-up slot in the AH app moves your shopping list into an order. `ah_get_delivery_slots` shows when delivery is possible; the other tools work on that order.
@@ -287,7 +385,7 @@ Choosing a delivery or pick-up slot in the AH app moves your shopping list into 
 
 </details>
 
-<details open>
+<details>
 <summary><b>Orders & receipts</b></summary>
 
 | Tool | Description |
@@ -327,6 +425,7 @@ Run it from the checkout with `node dist/index.js`, or use `/path/to/albert-heij
 | [`src/server/`](src/server) | Streamable HTTP transport and OAuth login |
 | [`src/tools/`](src/tools) | The MCP tools, one file per area |
 | [`deploy/`](deploy) | systemd unit, shipped in the package |
+| [`manifest.json`](manifest.json), [`.mcpbignore`](.mcpbignore) | Manifest of the `.mcpb` bundle, and the files it leaves out |
 | [`listing/`](listing) | Name, descriptions and icon to use in connector settings and app directories ([how](listing/README.md)) |
 | [`.github/`](.github) | CI, release workflow, Dependabot and the pinned `mcp-publisher` install |
 | [`assets/`](assets) | Logo for this README and the server icon shown by MCP clients |
@@ -341,69 +440,7 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 Before deploying a change, run a quick check against a real account: log in, search for `melk`, add a product to your shopping list and remove it again, then view your cart and orders.
 
-To release, set the new version with `npm version 1.2.3 --no-git-tag-version` and in both places in [`server.json`](server.json), merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. Only repository admins can create `v*` tags. The [release workflow](.github/workflows/release.yml) checks that the versions match, builds the package, attaches it to the GitHub release as `albert-heijn-mcp.tgz`, and stages it on npm through [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token is stored. Approve the staged version on npmjs.com (or with `npm stage approve`) to make it live; the workflow then updates the [MCP Registry](https://registry.modelcontextprotocol.io) entry. The release starts without notes; write them on GitHub.
-
-## Troubleshooting
-
-<details>
-<summary><b>Login fails with "exchange code"</b></summary>
-
-Codes work once and expire quickly. Ask to log in again and paste the new link straight away.
-</details>
-
-<details>
-<summary><b>No "Failed to launch" line after logging in</b></summary>
-
-Open the developer console before you submit the login form, or look for the `appie://login-exit?code=…` request in the Network tab. Browsers other than Chrome may show the link in an error page or dialog instead.
-</details>
-
-<details>
-<summary><b>"Not logged in", or the session seems broken</b></summary>
-
-Log out and back in through the assistant, or delete `tokens.json` from the [token location](#logging-in) and log in again.
-</details>
-
-<details>
-<summary><b>"There is no active delivery order to change"</b></summary>
-
-AH accepts order changes only once an order exists. Choose a delivery slot in the AH app or on ah.nl first.
-</details>
-
-<details>
-<summary><b>"The shopping list is not available while a delivery order is active"</b></summary>
-
-Choosing a slot moved your list into the order. Use `ah_get_cart` and `ah_update_cart_item` until the order is delivered or cancelled.
-</details>
-
-<details>
-<summary><b>"Already connected as …" when pasting a login code</b></summary>
-
-A code never replaces a working login, so a code from someone else's account can't switch you over. To switch accounts, ask to log out first, then log in again.
-</details>
-
-<details>
-<summary><b>The HTTP server doesn't start: "needs AH_MCP_TOKEN of at least 32 characters"</b></summary>
-
-Set `AH_MCP_TOKEN` to a long random value, e.g. the output of `openssl rand -hex 32`, and restart. Changing it logs out every client; reconnect them once.
-</details>
-
-<details>
-<summary><b>OAuth login shows "This login link is not valid"</b></summary>
-
-Start connecting again from the client. If it keeps happening right after you enter the token, check that `AH_MCP_BASE_URL` is exactly the address in your browser, including `https://`: the login form is only accepted from that address.
-</details>
-
-<details>
-<summary><b>OAuth login opens at localhost, or the client can't reach it</b></summary>
-
-Set `AH_MCP_BASE_URL` to the server's public `https://` URL and restart it. Clients are sent there to log in.
-</details>
-
-<details>
-<summary><b>Port 3000 is in use</b></summary>
-
-Set `AH_MCP_PORT` to another port, in the environment or `.env`.
-</details>
+To release, set the new version with `npm version 1.2.3 --no-git-tag-version` and in both places in [`server.json`](server.json) and in [`manifest.json`](manifest.json), merge it to `main`, and push a tag: `git tag v1.2.3 && git push origin v1.2.3`. Only repository admins can create `v*` tags. The [release workflow](.github/workflows/release.yml) checks that the versions match, builds the package, attaches it to the GitHub release as `albert-heijn-mcp.tgz` together with the `albert-heijn-mcp.mcpb` bundle, and stages the package on npm through [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token is stored. Approve the staged version on npmjs.com (or with `npm stage approve`) to make it live; the workflow then updates the [MCP Registry](https://registry.modelcontextprotocol.io) entry. The release starts without notes; write them on GitHub.
 
 ## License
 

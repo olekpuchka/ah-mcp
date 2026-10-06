@@ -16,6 +16,8 @@ export interface HttpOptions {
 }
 
 export interface Config {
+  /** `login`: log in from the terminal and exit, instead of serving MCP. */
+  command?: "login";
   transport: Transport;
   /** Don't open a browser on login (e.g. on a server). */
   remote: boolean;
@@ -27,17 +29,19 @@ export interface Config {
 }
 
 export const USAGE = `Usage: albert-heijn-mcp [--transport stdio|streamable-http] [--remote] [--version] [--help]
+       albert-heijn-mcp login [--remote]
 
+  login        log in to Albert Heijn from the terminal, save the tokens and exit
   --transport  stdio (default) or streamable-http
-  --remote     don't open a browser on login (also AH_REMOTE=true; always so
-               with streamable-http)
+  --remote     don't open a browser on login; ask for the code instead (also
+               AH_REMOTE=true; always so with streamable-http)
 
 Settings come from environment variables, also read from a .env file in the
 working directory. See README.md.`;
 
 /** Reads flags and environment variables. */
 export function loadConfig(argv: string[], env: NodeJS.ProcessEnv = process.env): Config {
-  const { values } = parseArgs({
+  const { values, positionals } = parseArgs({
     args: argv,
     options: {
       transport: { type: "string", default: "stdio" },
@@ -46,7 +50,13 @@ export function loadConfig(argv: string[], env: NodeJS.ProcessEnv = process.env)
       help: { type: "boolean", short: "h", default: false },
     },
     strict: true,
+    allowPositionals: true,
   });
+  const [command, ...extra] = positionals;
+  if ((command !== undefined && command !== "login") || extra.length > 0) {
+    throw new Error(`unknown command "${positionals.join(" ")}" (the only command is login)`);
+  }
+  if (command === "login" && values.transport !== "stdio") throw new Error("login doesn't take --transport");
   const transport = values.transport as Transport;
   if (!TRANSPORTS.includes(transport)) {
     throw new Error(`unknown transport "${values.transport}" (use ${TRANSPORTS.join(" or ")})`);
@@ -55,6 +65,7 @@ export function loadConfig(argv: string[], env: NodeJS.ProcessEnv = process.env)
   const baseUrl = env.AH_MCP_BASE_URL || `http://localhost:${port}`;
   if (!URL.canParse(baseUrl)) throw new Error(`AH_MCP_BASE_URL: "${baseUrl}" is not a URL (e.g. https://albert-heijn-mcp.example.com)`);
   return {
+    command,
     transport,
     // Over HTTP the user is elsewhere, so a browser opened on this machine wouldn't reach them.
     remote: values.remote || env.AH_REMOTE === "true" || transport === "streamable-http",

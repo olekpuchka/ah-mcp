@@ -147,9 +147,15 @@ To install it permanently instead, run `npm install --global albert-heijn-mcp` a
 
 ## Logging in
 
-AH's login page has a captcha that only works on AH's own website, so logging in takes two steps. You only do this once.
+Ask your assistant to log you in to Albert Heijn. You only do this once; the login is then kept and renewed automatically.
 
-1. **Ask your assistant to log you in.** It gives you a link to AH's login page, and on your own computer it also opens it in your browser. Log in as usual.
+**On your computer** (Claude Desktop, Cursor, VS Code and other local apps), a separate browser window opens with AH's login page. Log in there as usual: the window closes by itself and you're logged in. Then tell your assistant you're done.
+
+The window uses a fresh, empty browser profile, so type your password: saved passwords and password-manager extensions aren't available there. It needs Chrome, Edge, Brave or Chromium (not the snap version on Ubuntu) and a screen; otherwise you copy the code by hand as below.
+
+**On a server** (ChatGPT, Claude.ai), or when no login window can open, you copy a code by hand. AH's login page has a captcha that only works on AH's own website, so the code has to come from your browser:
+
+1. **Open the link** your assistant gives you and log in as usual.
 2. **Copy the code back into the chat.** After you log in, AH tries to open its phone app, which your browser can't do, so the page seems stuck. The code you need is in the browser's developer console, a panel for web developers that you can open safely:
    - Open it in Chrome with <kbd>⌘</kbd> <kbd>⌥</kbd> <kbd>J</kbd> on Mac, or <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>J</kbd> on Windows and Linux.
    - Find this red line:
@@ -160,7 +166,7 @@ AH's login page has a captcha that only works on AH's own website, so logging in
 
    - Copy the part from `appie://` up to the closing quote and paste it into the chat. The code works once and expires quickly, so paste it right away.
 
-No line there? See [Troubleshooting](#troubleshooting).
+No line there? See [Troubleshooting](#troubleshooting). To log a server in without the developer console, see [Running it on a server](#running-it-on-a-server).
 
 <details>
 <summary><b>Where your login is stored</b></summary>
@@ -177,6 +183,12 @@ Override the location with `AH_TOKENS_PATH`.
 </details>
 
 ## Troubleshooting
+
+<details>
+<summary><b>No login window opens</b></summary>
+
+The login window needs Chrome, Edge, Brave or Chromium installed in the usual place, and a screen: not over SSH, and not with Ubuntu's snap Chromium. Without one, your assistant gives you the link instead, and you [copy the code by hand](#logging-in). If the window closed before you finished, ask to log in again.
+</details>
 
 <details>
 <summary><b>No "Failed to launch" line after logging in</b></summary>
@@ -285,6 +297,16 @@ It runs as a hardened systemd service behind a reverse proxy, installed from npm
    }
    ```
 
+To log the server in to Albert Heijn, ask a connected app to log you in and [copy the code by hand](#logging-in). Or skip the code: log in on your own computer with the login window, then copy the login to the server:
+
+```bash
+AH_TOKENS_PATH=./server-tokens.json npx -y albert-heijn-mcp login
+scp server-tokens.json your-server:ah-tokens.json && rm server-tokens.json
+ssh -t your-server 'sudo sh -c "install -d -o albert-heijn-mcp -g albert-heijn-mcp -m 700 /home/albert-heijn-mcp/.config/albert-heijn-mcp && install -o albert-heijn-mcp -g albert-heijn-mcp -m 600 $HOME/ah-tokens.json /home/albert-heijn-mcp/.config/albert-heijn-mcp/tokens.json.new && mv /home/albert-heijn-mcp/.config/albert-heijn-mcp/tokens.json.new /home/albert-heijn-mcp/.config/albert-heijn-mcp/tokens.json && rm $HOME/ah-tokens.json"'
+```
+
+The server picks it up on the next request; no restart needed. The separate file keeps your computer's own login apart: AH replaces a login every time it's renewed, so only one place can use each login. On a host without SSH, upload it to where the server keeps its login: `AH_TOKENS_PATH`, or the [default location](#logging-in) for the user it runs as.
+
 The service can write only to `/home/albert-heijn-mcp`, where it keeps its tokens. If you point `AH_LOG_FILE` elsewhere, add that path to `ReadWritePaths` in the unit file.
 
 ## Configuration
@@ -293,7 +315,7 @@ Settings are environment variables. They can also go in a `.env` file in the wor
 
 | Variable | Default | Description |
 |---|---|---|
-| `AH_REMOTE` | `false` | Don't open a browser on login (same as `--remote`). Always on with `streamable-http`. |
+| `AH_REMOTE` | `false` | Don't open a browser on login; log in by copying the code instead (same as `--remote`). Always on with `streamable-http`. |
 | `AH_TOKENS_PATH` | [per OS](#logging-in) | Where to store login tokens. |
 | `AH_MCP_HOST` | `127.0.0.1` | Interface the HTTP server listens on. Keep the default behind a reverse proxy. |
 | `AH_MCP_PORT` | `3000` | HTTP server port. |
@@ -305,9 +327,10 @@ Command-line flags:
 
 ```
 node dist/index.js [--transport stdio|streamable-http] [--remote] [--version] [--help]
+node dist/index.js login [--remote]
 ```
 
-`stdio` (the default) is for local clients; `streamable-http` serves MCP at `/mcp`, with OAuth login at `/authorize`.
+`stdio` (the default) is for local clients; `streamable-http` serves MCP at `/mcp`, with OAuth login at `/authorize`. `login` logs in to Albert Heijn from the terminal, saves the tokens and exits; with `--remote` it asks for the code instead of opening a login window.
 
 ## Tools
 
@@ -320,7 +343,7 @@ Tools that return data also return it as [structured output](https://modelcontex
 
 | Tool | Description |
 |---|---|
-| `ah_login` | Log in: returns AH's login link, then completes the login with the code you paste back. |
+| `ah_login` | Log in: opens a login window on your computer, or returns AH's login link and completes the login with the code you paste back. |
 | `ah_logout` | Delete the stored tokens, to switch accounts or reset a session. |
 | `ah_get_member_profile` | Name, masked email, and bonus card number (last 4 digits). |
 
@@ -419,9 +442,9 @@ Run it from the checkout with `node dist/index.js`, or use `/path/to/albert-heij
 
 | Path | Contents |
 |---|---|
-| [`src/index.ts`](src/index.ts), [`src/config.ts`](src/config.ts) | Entry point, flags and settings |
+| [`src/index.ts`](src/index.ts), [`src/config.ts`](src/config.ts), [`src/loginCommand.ts`](src/loginCommand.ts) | Entry point, flags and settings, and the `login` command |
 | [`src/ahapi/`](src/ahapi) | Client for AH's REST and GraphQL API, on Node's built-in `fetch` |
-| [`src/auth/`](src/auth) | Login code exchange, token storage and refresh |
+| [`src/auth/`](src/auth) | Login window, login code exchange, token storage and refresh |
 | [`src/server/`](src/server) | Streamable HTTP transport and OAuth login |
 | [`src/tools/`](src/tools) | The MCP tools, one file per area |
 | [`deploy/`](deploy) | systemd unit, shipped in the package |

@@ -1,7 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { type AhClient, getMember, hasStatus } from "../ahapi/index.ts";
+import { type AhClient, getMember, hasStatus, isUnauthorized } from "../ahapi/index.ts";
+import { BrowserLogin } from "../auth/browser.ts";
 import { NotLoggedInError } from "../auth/session.ts";
 import type { Session } from "../auth/session.ts";
 import { log } from "../log.ts";
@@ -27,6 +28,8 @@ export interface ToolContext {
   session: Session;
   /** Don't open a browser on login. */
   remote: boolean;
+  /** Login in a browser window, see ah_login. */
+  browserLogin: BrowserLogin;
   searches: TtlCache<Product[]>;
   products: TtlCache<Product>;
   nutrition: TtlCache<Nutrient[] | undefined>;
@@ -40,6 +43,7 @@ export function newToolContext(session: Session, remote: boolean): ToolContext {
   return {
     session,
     remote,
+    browserLogin: new BrowserLogin(),
     searches: new TtlCache(5 * 60_000),
     products: new TtlCache(10 * 60_000),
     nutrition: new TtlCache(60 * 60_000),
@@ -148,25 +152,11 @@ export function addAuthedTool<Shape extends z.ZodRawShape>(
 ): void {
   addTool(server, def, async (args) => {
     try {
-      const c = await ctx.session.client();
-      try {
-        return await handler(c, args);
-      } catch (err) {
-        if (!isUnauthorized(err) || !c.token) throw err;
-        return await handler(await ctx.session.refreshAfterRejection(c.token), args);
-      }
+      return await ctx.session.withClient((c) => handler(c, args));
     } catch (err) {
       throw err instanceof NotLoggedInError ? new Error(NOT_AUTHENTICATED) : err;
     }
   });
-}
-
-/** Reports whether err, or any error in its cause chain, is an HTTP 401 from AH. */
-export function isUnauthorized(err: unknown): boolean {
-  for (let e = err; e instanceof Error; e = e.cause) {
-    if (hasStatus(e, 401)) return true;
-  }
-  return false;
 }
 
 export { wrapError } from "../ahapi/index.ts";

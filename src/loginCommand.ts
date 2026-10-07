@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import { fullName, LOGIN_URL } from "./ahapi/index.ts";
 import { findBrowser, loginInWindow, openInDefaultBrowser } from "./auth/browser.ts";
-import { extractCode, manualLoginSteps } from "./auth/login.ts";
+import { extractCode, manualLoginSteps, STALE_LOGIN } from "./auth/login.ts";
 import type { Session } from "./auth/session.ts";
 
 /**
@@ -16,7 +16,7 @@ export async function runLogin(session: Session, remote: boolean): Promise<void>
     console.log(`Already logged in${who}. To switch accounts, delete ${session.tokensPath} first.`);
     return;
   }
-  if (status.state === "stale") console.log("The stored login no longer works, so log in again.");
+  if (status.state === "stale") console.log(STALE_LOGIN);
 
   // A login saved meanwhile, e.g. by an MCP client, is kept.
   const save = (code: string) => session.completeLogin(code, status.refreshToken);

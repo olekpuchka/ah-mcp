@@ -155,16 +155,17 @@ The window uses a fresh, empty browser profile, so type your password: saved pas
 
 **On a server** (ChatGPT, Claude.ai), or when no login window can open, you copy a code by hand. AH's login page has a captcha that only works on AH's own website, so the code has to come from your browser:
 
-1. **Open the link** your assistant gives you and log in as usual.
-2. **Copy the code back into the chat.** After you log in, AH tries to open its phone app, which your browser can't do, so the page seems stuck. The code you need is in the browser's developer console, a panel for web developers that you can open safely:
-   - Open it in Chrome with <kbd>⌘</kbd> <kbd>⌥</kbd> <kbd>J</kbd> on Mac, or <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>J</kbd> on Windows and Linux.
-   - Find this red line:
+You need a computer for this, not a phone or tablet: their browsers have no developer console. Chrome, Edge or Brave work best.
 
-     ```
-     Failed to launch 'appie://login-exit?code=…' because the scheme does not have a registered handler.
-     ```
+1. **Open the link** your assistant gives you, but don't log in yet.
+2. **Open the developer console** in that tab, a panel for web developers that you can open safely: <kbd>⌘</kbd> <kbd>⌥</kbd> <kbd>J</kbd> on Mac, or <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>J</kbd> on Windows and Linux.
+3. **Log in** as usual. AH then tries to open its phone app, which your browser can't do, so the page seems stuck. In the console, find this red line:
 
-   - Copy the part from `appie://` up to the closing quote and paste it into the chat. The code works once and expires quickly, so paste it right away.
+   ```
+   Failed to launch 'appie://login-exit?code=…' because the scheme does not have a registered handler.
+   ```
+
+4. **Copy the part from `appie://` up to the closing quote** and paste it into the chat. The code works once and expires quickly, so paste it right away.
 
 No line there? See [Troubleshooting](#troubleshooting). To log a server in without the developer console, see [Running it on a server](#running-it-on-a-server).
 
@@ -193,7 +194,7 @@ The login window needs Chrome, Edge, Brave or Chromium installed in the usual pl
 <details>
 <summary><b>No "Failed to launch" line after logging in</b></summary>
 
-Open the developer console before you submit the login form, or look for the `appie://login-exit?code=…` request in the Network tab. Browsers other than Chrome may show the link in an error page or dialog instead.
+The developer console has to be open before you log in. Open it, then open the login link again in that same tab and log in. If AH skips the login form because you're still logged in, that's fine: the line appears all the same. You can also look for the `appie://login-exit?code=…` request in the Network tab. Browsers other than Chrome, Edge or Brave may show the link in an error page or dialog instead.
 </details>
 
 <details>
@@ -206,6 +207,14 @@ Codes work once and expire quickly. Ask to log in again and paste the new link s
 <summary><b>"Not logged in", or the session seems broken</b></summary>
 
 Ask your assistant to log you out and back in, or delete `tokens.json` from the [login location](#logging-in) and log in again.
+</details>
+
+<details>
+<summary><b>"The Albert Heijn login has expired"</b></summary>
+
+Albert Heijn no longer accepts the stored login. Ask your assistant to log in to Albert Heijn again. Reconnecting your app to the server doesn't help: that's a separate login.
+
+If it keeps expiring on your server, keep `tokens.json` on storage that survives restarts and redeploys, and run a single instance. AH replaces the login every time it's renewed, so an older copy of the file, or a second instance renewing on its own, gets rejected.
 </details>
 
 <details>

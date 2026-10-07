@@ -21,6 +21,8 @@ export interface Config {
   transport: Transport;
   /** Don't open a browser on login (e.g. on a server). */
   remote: boolean;
+  /** Served over HTTP: users connect from apps elsewhere, possibly on a phone. */
+  hosted: boolean;
   showVersion: boolean;
   showHelp: boolean;
   tokensPath: string;
@@ -69,6 +71,7 @@ export function loadConfig(argv: string[], env: NodeJS.ProcessEnv = process.env)
     transport,
     // Over HTTP the user is elsewhere, so a browser opened on this machine wouldn't reach them.
     remote: values.remote || env.AH_REMOTE === "true" || transport === "streamable-http",
+    hosted: transport === "streamable-http",
     showVersion: values.version,
     showHelp: values.help,
     tokensPath: env.AH_TOKENS_PATH || defaultTokensPath(),

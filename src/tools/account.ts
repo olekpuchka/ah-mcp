@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { fullName, getMember, LOGIN_URL } from "../ahapi/index.ts";
 import { openInDefaultBrowser } from "../auth/browser.ts";
-import { extractCode, manualLoginSteps } from "../auth/login.ts";
+import { extractCode, manualLoginSteps, STALE_LOGIN } from "../auth/login.ts";
 import { log } from "../log.ts";
 import { addAuthedTool, addTool, structured, text, type ToolContext } from "./common.ts";
 
@@ -16,9 +16,10 @@ export function registerAccountTools(server: McpServer, ctx: ToolContext): void 
       description:
         "Log in to Albert Heijn. Call without arguments to start. " +
         "On the user's own computer this usually opens a login window that finishes the login by itself. " +
-        "Otherwise it returns the AH login link and instructions to show the user: after logging in, " +
-        "the browser shows a link like appie://login-exit?code=...; call ah_login again with code set to " +
-        "that link (or just the code) to finish. Codes are single-use and expire quickly. " +
+        "Otherwise it returns the AH login link and step-by-step instructions: show them to the user as given, " +
+        "in order (the developer console must be open before they log in). The user then copies a link like " +
+        "appie://login-exit?code=...; call ah_login again with code set to that link (or just the code) to finish. " +
+        "Codes are single-use and expire quickly. " +
         "If already logged in, returns the account name; to switch accounts, call ah_logout first.",
       input: {
         code: z
@@ -56,8 +57,8 @@ export function registerAccountTools(server: McpServer, ctx: ToolContext): void 
         const name = await ctx.session.memberName();
         return text(name ? `Login successful! Connected as ${name}.` : "Login successful!");
       }
-      const intro = status.state === "stale" ? "The stored login no longer works, so log in again.\n\n" : "";
-      if (ctx.remote) return text(intro + manualLogin(false));
+      const intro = status.state === "stale" ? `${STALE_LOGIN}\n\n` : "";
+      if (ctx.remote) return text(intro + manualLogin(false, ctx.hosted));
       if (ctx.browserLogin.running) {
         return text(
           `${intro}The login window is still open: ask the user to finish logging in there, then call ah_login again.\n\n` +
@@ -139,7 +140,17 @@ function maskEmail(email: string): string {
   return `${email.slice(0, Math.min(3, at - 1))}…${email.slice(at)}`;
 }
 
-/** Steps for logging in by copying the code by hand. */
-function manualLogin(opened: boolean): string {
-  return `To log in to Albert Heijn:\n\n${manualLoginSteps(opened, "here")}`;
+/** Hosted logins are often started from a phone app, whose browser has no developer console. */
+const HOSTED_LOGIN_NOTE =
+  "This needs a computer: phone browsers have no developer console.\n\n";
+
+/** For whoever runs the server: the login command needs no developer console. */
+const SERVER_LOGIN_HINT =
+  "\n\nWhoever runs this server can instead log it in without the console, from their own computer: " +
+  "see https://github.com/olekpuchka/albert-heijn-mcp#running-it-on-a-server";
+
+/** Steps for logging in by copying the code by hand; hosted adds what matters when the server runs elsewhere. */
+function manualLogin(opened: boolean, hosted = false): string {
+  const steps = manualLoginSteps(opened, "here");
+  return `To log in to Albert Heijn:\n\n${hosted ? HOSTED_LOGIN_NOTE + steps + SERVER_LOGIN_HINT : steps}`;
 }

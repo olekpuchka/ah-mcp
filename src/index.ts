@@ -52,7 +52,7 @@ async function main(): Promise<void> {
   if (cfg.logFile) await logToFile(cfg.logFile);
   log.info("albert-heijn-mcp", { version });
 
-  const ctx = newToolContext(new Session(cfg.tokensPath), cfg.remote);
+  const ctx = newToolContext(new Session(cfg.tokensPath), cfg);
   const newServer = () => {
     const server = new McpServer({ name: "Albert Heijn", version, icons: [ICON] }, { instructions: INSTRUCTIONS });
     registerTools(server, ctx);

@@ -21,7 +21,7 @@ export class NotLoggedInError extends Error implements LogSafe {
 /** AH rejected the stored refresh token (expired or revoked): the user must log in again. */
 export class SessionExpiredError extends ContextError {
   constructor(cause: unknown) {
-    super("token refresh failed; log in again", cause);
+    super("token refresh failed: the Albert Heijn login expired or was revoked; log in to Albert Heijn again", cause);
     this.name = "SessionExpiredError";
   }
 }

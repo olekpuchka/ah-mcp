@@ -3,8 +3,8 @@ import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/
 import { z } from "zod";
 import { type AhClient, getMember, hasStatus, isUnauthorized } from "../ahapi/index.ts";
 import { BrowserLogin } from "../auth/browser.ts";
-import { NotLoggedInError } from "../auth/session.ts";
-import type { Session } from "../auth/session.ts";
+import { NotLoggedInError, type Session, SessionExpiredError } from "../auth/session.ts";
+import { DamagedTokensError } from "../auth/tokens.ts";
 import { log } from "../log.ts";
 import { TtlCache } from "./cache.ts";
 import type { BonusOffer, BonusPeriod, Member, Nutrient, Product } from "../ahapi/index.ts";
@@ -28,6 +28,8 @@ export interface ToolContext {
   session: Session;
   /** Don't open a browser on login. */
   remote: boolean;
+  /** Served over HTTP: users connect from apps elsewhere, possibly on a phone. */
+  hosted: boolean;
   /** Login in a browser window, see ah_login. */
   browserLogin: BrowserLogin;
   searches: TtlCache<Product[]>;
@@ -39,10 +41,11 @@ export interface ToolContext {
   members: TtlCache<Member>;
 }
 
-export function newToolContext(session: Session, remote: boolean): ToolContext {
+export function newToolContext(session: Session, { remote, hosted }: { remote: boolean; hosted: boolean }): ToolContext {
   return {
     session,
     remote,
+    hosted,
     browserLogin: new BrowserLogin(),
     searches: new TtlCache(5 * 60_000),
     products: new TtlCache(10 * 60_000),
@@ -94,7 +97,7 @@ export function structured(data: Record<string, unknown>, message?: string): Cal
 const MAX_ERROR_LENGTH = 500;
 
 function errorResult(err: unknown): CallToolResult {
-  const message = err instanceof Error ? err.message : String(err);
+  const message = err instanceof Error ? (modelMessage(err) ?? err.message) : String(err);
   const text = message.length > MAX_ERROR_LENGTH ? `${message.slice(0, MAX_ERROR_LENGTH)}…` : message;
   return { content: [{ type: "text", text }], isError: true };
 }
@@ -143,6 +146,25 @@ const NOT_AUTHENTICATED = JSON.stringify({
   message: "Not logged in. Call ah_login first.",
 });
 
+// Not "log in again" alone: that reads as reconnecting the MCP client, which doesn't help.
+const SESSION_EXPIRED = JSON.stringify({
+  error: "session_expired",
+  message:
+    "The Albert Heijn login has expired or was revoked. Call ah_login to log in to Albert Heijn again; " +
+    "reconnecting the MCP client doesn't help.",
+});
+
+/**
+ * What to tell the model instead of err's message, for errors it should act on in a set way. Not when
+ * wrapped: then something else failed, and loginStatus wouldn't agree that a login is needed.
+ */
+function modelMessage(err: Error): string | undefined {
+  // A damaged tokens file is replaced by the next login; its path is the server's business.
+  if (err instanceof NotLoggedInError || err instanceof DamagedTokensError) return NOT_AUTHENTICATED;
+  if (err instanceof SessionExpiredError) return SESSION_EXPIRED;
+  return undefined;
+}
+
 /** Registers a tool that needs a login. On a 401, refreshes the token and retries once. */
 export function addAuthedTool<Shape extends z.ZodRawShape>(
   server: McpServer,
@@ -150,13 +172,7 @@ export function addAuthedTool<Shape extends z.ZodRawShape>(
   def: ToolDef<Shape>,
   handler: (c: AhClient, args: Args<Shape>) => Promise<CallToolResult>,
 ): void {
-  addTool(server, def, async (args) => {
-    try {
-      return await ctx.session.withClient((c) => handler(c, args));
-    } catch (err) {
-      throw err instanceof NotLoggedInError ? new Error(NOT_AUTHENTICATED) : err;
-    }
-  });
+  addTool(server, def, (args) => ctx.session.withClient((c) => handler(c, args)));
 }
 
 export { wrapError } from "../ahapi/index.ts";
